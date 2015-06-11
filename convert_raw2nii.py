@@ -249,7 +249,7 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                             if nr_realmrtypes > 1:
                                 realmrtype_suffix = "-t{0:03d}".format(
                                     iSlices_sorted[nLine,4])
-                                realmrtype_ndsuffix = "-s{0:03d}".format(
+                                realmrtype_ndsuffix = "-t{0:03d}".format(
                                     nr_realmrtypes)
                             else:
                                 realmrtype_suffix = ""
