@@ -175,8 +175,8 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                         ('diffusion_b_value_number', int)]
                     #par.slice_index_as_rec = np.rec.fromrecords(rows, dtype=rectypes)
                     iSlices_sorted = iSlice[
-                        np.lexsort((iSlice[:,5], iSlice[:,4],
-                        iSlice[:,1], iSlice[:,11], iSlice[:,2], iSlice[:,0]))]
+                        np.lexsort((iSlice[:,0], iSlice[:,2],
+                        iSlice[:,11], iSlice[:,1], iSlice[:,4], iSlice[:,5]))]
                     nLine = 0
                     nr_mrtypes = len(np.unique(iSlices_sorted[:,5]))
                     nr_echos = len(np.unique(iSlices_sorted[:,1]))
@@ -233,26 +233,21 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                         slicenr += 1
                         if NewFile[nLine]:
                             if nr_dyn > 1:
-                                str_func = np.vectorize(
-                                    lambda x: "-{0:04d}".format(x))
-                                dyn_suffix = str_func(iSlices_sorted[nLine,2])
+                                dyn_suffix = "-{0:04d}".format(
+                                    iSlices_sorted[nLine,2])
                                 dyn_ndsuffix = "-d{0:04d}".format(nr_dyn)
                             else:
                                 dyn_suffix = "-{0:04d}".format(1)
                                 dyn_ndsuffix = ""
                             if nr_mrtypes > 1:
-                                str_func = np.vectorize(
-                                    lambda x: "-s{0:03d}".format(x))
-                                mrtype_suffix = str_func(
+                                mrtype_suffix = "-s{0:3d}".format(
                                     iSlices_sorted[nLine,5])
                                 mrtype_ndsuffix = "-s{0:03d}".format(nr_mrtypes)
                             else:
                                 mrtype_suffix = ""
                                 mrtype_ndsuffix = ""
                             if nr_realmrtypes > 1:
-                                str_func = np.vectorize(
-                                    lambda x: "-t{0:03d}".format(x))
-                                realmrtype_suffix = str_func(
+                                realmrtype_suffix = "-t{0:03d}".format(
                                     iSlices_sorted[nLine,4])
                                 realmrtype_ndsuffix = "-s{0:03d}".format(
                                     nr_realmrtypes)
@@ -260,17 +255,14 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                                 realmrtype_suffix = ""
                                 realmrtype_ndsuffix = ""
                             if nr_echos > 1:
-                                str_func = np.vectorize(
-                                    lambda x: "-e{0:03d}".format(x))
-                                echo_suffix = str_func(iSlices_sorted[nLine,1])
+                                echo_suffix = "-e{0:03d}".format(
+                                    iSlices_sorted[nLine,1])
                                 echo_ndsuffix = "-e{0:03d}".format(nr_echos)
                             else:
                                 echo_suffix = ""
                                 echo_ndsuffix = ""
                             if nr_diffgrads > 1:
-                                str_func = np.vectorize(
-                                    lambda x: "-g{0:03d}".format(x))
-                                diffgrad_suffix = str_func(
+                                diffgrad_suffix = "-g{0:03d}".format(
                                     iSlices_sorted[nLine,11])
                                 diffgrad_ndsuffix = "-g{0:03d}".format(
                                     nr_diffgrads)
