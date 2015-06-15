@@ -51,10 +51,9 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                 .format(full_parfilename))
         else:
             if altfolder:
-                outfoldername = os.path.join(os.path.expanduser(altfolder),
-                    os.path.basename(pathpar))
+                outfoldername = os.path.expanduser(altfolder)
             else:
-                outfoldername = pathpar
+                outfoldername = 'NIFTI'
             Vox = Parameters.vox
             Recfile = parfilename
             basename, ext = os.path.splitext(os.path.basename(Recfile))
