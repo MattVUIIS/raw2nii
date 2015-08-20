@@ -11,22 +11,22 @@ from spm_type import spm_type
 from write_nii import WriteNii
 
 
-def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
-        subaan=None, altfolder=None, outputformat=None, angulation=None,
+def convert_raw2nii(filelist, prefix="", suffix="", pathpar="",
+        outfolder=None, outputformat=None, angulation=None,
         rescale=None, dim=3, dti_revertb0=0):
     """
         filelist: list containing PAR file names (without path info) to convert
             into analyze/nifti
-        prefix       : characters to prepend to all output folder and filenames,
-                       use '' when not needed. Cell array of prefixes
-                       can be used to use different prefix for each
-                       corresponding file in filelist. (NIXED)
-        usefulprefix: when 1, do not append PARfilename to output files, use
-                       prefix only, plus filenumber
+        prefix       : characters to prepend to all output filenames.
+                       Blank by default. The prefix, PAR filename (without the
+                       extension), suffix, and the file number are used
+                       respectively to form the output filename.
+        suffix       : characters to append to all output filenames.
+                       Blank by default. The prefix, PAR filename (without the
+                       extension), suffix, and the file number are used
+                       respectively to form the output filename.
         pathpar      : complete path containing PAR files (with trailing /)
-        subaan       : when 1 checked, files will be written in a different
-                       subdirectory per PAR file, otherwise all to pathpar
-        altfolder    : when set, files will be written to this directory,
+        outfolder    : when set, files will be written to this directory,
                        including lowest level folder containing parfile
         outputformat : 1 for Nifty output format (spm5), 2 for Analyze (spm2)
         angulation   : when 1: include affine transformation as defined in PAR
@@ -50,10 +50,14 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
             logger.warning('Skipping volume {0} because of reading errors.'
                 .format(full_parfilename))
         else:
-            if altfolder:
-                outfoldername = os.path.expanduser(altfolder)
+            if outfolder:
+                absDir = os.path.abspath(os.path.expanduser(outfolder))
             else:
-                outfoldername = 'NIFTI'
+                absDir = os.path.abspath('NIFTI')
+            if not os.path.exists(absDir):
+                logger.debug("Makedirs on: {0}".format(absDir))
+                os.makedirs(absDir)
+            logger.debug("Check dir: {0}".format(absDir))
             Vox = Parameters.vox
             Recfile = parfilename
             basename, ext = os.path.splitext(os.path.basename(Recfile))
@@ -61,20 +65,8 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                 Recfile = basename + '.rec'
             elif '.PAR' == ext:
                 Recfile = basename + '.REC'
-            if subaan == 1:
-                if usefulprefix == 1:
-                    subdir = prefix
-                else:
-                    subdir = os.path.join(prefix,
-                        parfilename[:len(parfilename) - 4])
-                absDir = os.path.join(outfoldername, subdir)
-                logger.debug("Check dir: {0}".format(absDir))
-                if not os.path.exists(absDir):
-                    logger.debug("Makedirs on: {0}".format(absDir))
-                    os.makedirs(absDir)
-            else:
-                subdir = ''
-                absDir = os.path.join(outfoldername, subdir)
+            outBaseName, _ = os.path.splitext(os.path.basename(parfilename))
+            outFileName = prefix + outBaseName + suffix
             Precision = 'int' + str(Parameters.bit)
             Size = Parameters.dim[0] * Parameters.dim[1] * Parameters.dim[2]
             chunk_size = Size * (Parameters.bit // 8)
@@ -114,7 +106,7 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                                 (Parameters.dim(1), Parameters.dim(0),
                                 Parameters.dim(2)))
                         VolNameSinExt = os.path.join(absDir,
-                            subdir + '-{0:03.0f}'.format(j))
+                            outFileName + '-{0:03.0f}'.format(j))
                         if 1 == outputformat:
                             VolName = VolNameSinExt + '.nii'
                             logger.info('Writing file: {0}...'.format(VolName))
@@ -133,7 +125,7 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                         VolData = np.array([])
                         outfiles.append(VolName)
                         outfcount += 1
-                        logger.info('Write file: {0}-{1}'.format(subdir,
+                        logger.info('Write file: {0}-{1}'.format(outFileName,
                             '{0:03.0f}'.format(j)))
                 elif Parameters.ResToolsVersion in ('V4', 'V4.1', 'V4.2'):
                     if angulation == 1:
@@ -275,12 +267,12 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                             NHdr = CreateNiiHdr(Parameters, angulation, rescale,
                                 nii_hdr_dim)
                             if 3 == dim:
-                                VolNameSinExt = os.path.join(absDir, subdir +
+                                VolNameSinExt = os.path.join(absDir, outFileName +
                                     echo_suffix + realmrtype_suffix +
                                     mrtype_suffix + diffgrad_suffix +
                                     dyn_suffix)
                             elif 4 == dim:
-                                VolNameSinExt = os.path.join(absDir, subdir +
+                                VolNameSinExt = os.path.join(absDir, outFileName +
                                     echo_suffix + realmrtype_suffix +
                                     mrtype_suffix + diffgrad_suffix +
                                     dyn_ndsuffix)
@@ -302,10 +294,11 @@ def convert_raw2nii(filelist, prefix=None, usefulprefix=None, pathpar="",
                                     NHdr.dim.val[4] = NHdr.dim.val(5)
                                     NHdr.dim.val[5] = d
                                     NHdr.pixdim.val[4] = 1
-                                VolNameSinExt = os.path.join(absDir, subdir +
+                                VolNameSinExt = os.path.join(absDir, outFileName +
                                     echo_ndsuffix + realmrtype_ndsuffix +
                                     mrtype_ndsuffix + diffgrad_ndsuffix +
                                     dyn_ndsuffix)
+                            logger.info("VolNameSinExt: {0}".format(VolNameSinExt))
                             Slice = np.zeros((cDim[0], cDim[1]))
                             if 1 == outputformat:
                                 VolName = VolNameSinExt + '.nii'
@@ -347,10 +340,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filelist", nargs="+", type=str)
     parser.add_argument("--prefix", default="")
-    parser.add_argument("--usefulprefix", type=int, default=0)
+    parser.add_argument("--suffix", default="")
     parser.add_argument("--pathpar", default="")
-    parser.add_argument("--subaan", type=int, default=1)
-    parser.add_argument("--altfolder", default=None)
+    parser.add_argument("--outfolder", default=None)
     parser.add_argument("--outputformat", type=int, default=1)
     parser.add_argument("--angulation", type=int, default=1)
     parser.add_argument("--rescale", type=int, default=1)
