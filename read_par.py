@@ -139,6 +139,13 @@ def read_par(parfilename):
             rows = []
             line = None
             first_row = None
+#1   1    1  1 0 2     0  16    50  256  256     0.00000   7.11331 8.67964e-03  1070  1860   0.00   0.00   0.00  -20.00   20.00   60.00 10.000 10.000 0 2 0 2  0.977  0.977   4.60    0.00     0.00    0.00   1   15.00     0    0    0    64   0.0  1   1    7    0   0.000    0.000    0.000  1
+            #col_types = (int, int, int, int, int, int, int, int, int, int, int,
+            #    float, float, float, int, int, float, float, float, float,
+            #    float, float, float, float, int, int, int, int, float,
+            #    float, float, float, float, float, int, float, int, int,
+            #    int, int, float, int, int, str, str, float, float, float,
+            #    int)
             while line != "":
                 line = parfile.readline()
                 if line.strip() == "":  # Empty line
@@ -148,9 +155,11 @@ def read_par(parfilename):
                 cols = line.strip().split()
                 #Grab first 11 cols, and 43rd for diffusion gradient number
                 row = [int(i) for i in cols[:11] + cols[42:43]]
+                #row = [col_types[i](x) for i, x in enumerate(cols, 0)]
                 if first_row is None:
                     first_row = cols
                 rows.append(row)
+            last_row = cols
             """
             #All columns
             rectypes = [('slice_number', int), ('echo_number', int),
@@ -195,11 +204,11 @@ def read_par(parfilename):
                 slice_index = np.concatenate((slice_index, zeros), axis=1)
             if par.dyn > 1:
                 #estimate scan-duration from dtime PAR file row
-                par.RT = (slice_index[-1,32] - slice_index[1,32]) / (par.dyn
+                par.RT = (float(last_row[32]) - float(first_row[32])) / (par.dyn
                     - 1)
             else:
                 par.RT = np.nan
-            par.slice_index = slice_index
+            par.slice_index = slice_index[:,0:12]
             #rectypes = [('slice_number', int), ('echo_number', int),
             #    ('dynamic_scan_number', int), ('cardiac_phase_number', int),
             #    ('image_type_mr', int), ('scanning_sequence', int),

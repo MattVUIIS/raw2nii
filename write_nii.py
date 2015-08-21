@@ -1,4 +1,5 @@
 from __future__ import division
+import binascii
 import logging
 import numpy as np
 import struct
@@ -7,6 +8,7 @@ import struct
 def WriteNii(fname, NHdr, Data3D):
     logger = logging.getLogger('raw2nii')
     try:
+        logger.debug("Writing NHdr...")
         with open(fname, 'wb') as fid:
             #write header to nii binary
             fn = NHdr.fieldnames()
@@ -16,16 +18,31 @@ def WriteNii(fname, NHdr, Data3D):
                 val = hdrfield.val
                 if not isinstance(val, np.ndarray):  # If writing simple value
                     if prec == 's':  # Writing a string
-                        fid.write(val)
+                        packed = val
+                        logger.debug("Field {0}[{1}] (prec={2}, val='{3}', "
+                            "packed string='{4}')".format(key, fid.tell(), prec,
+                            val, packed))
+                        fid.write(packed)
                     else:
-                        fid.write(struct.pack(prec, val))
+                        packed = struct.pack(prec, val)
+                        logger.debug("Field {0}[{1}] (prec={2}, val='{3}', "
+                            "packed bytes='{4}')".format(key, fid.tell(), prec,
+                            val, binascii.hexlify(packed)))
+                        fid.write(packed)
                 else: # If writing array
                     if len(val.shape) == 1:  # If 1D array
-                        fid.write(struct.pack(prec * len(val),
-                            *list(val)))
+                        packed = struct.pack(prec * len(val), *list(val))
+                        logger.debug("Field {0}[{1}] (prec={2}, val='{3}', "
+                            "packed array='{4}')".format(key, fid.tell(), prec,
+                            val, binascii.hexlify(packed)))
+                        fid.write(packed)
                     else:
                         #Transpose matrix before writing to get Fortran order
-                        val.astype(prec).T.tofile(fid)
+                        packed = val.astype(prec).T
+                        logger.debug("Field {0}[{1}] (prec={2}, val='{3}', "
+                            "packed matrix='{4}')".format(key, fid.tell(), prec,
+                            val, binascii.hexlify(packed.tobytes())))
+                        packed.tofile(fid)
                 fid.flush()
             if 8 == NHdr.bitpix.val:
                 bitpixstr = 'int8'
