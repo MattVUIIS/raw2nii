@@ -14,21 +14,21 @@ def _set_larger(A, B):
 
 def calc_angulation(par, angulation):
     logger = logging.getLogger('raw2nii')
-    if angulation == 1:
+    if angulation:
         # trying to incorporate AP FH RL rotation angles: determined using some
         # common sense, Chris Rordon's help + source code and trial and error,
         # this is considered EXPERIMENTAL!
         rads = np.deg2rad(par.angRL)
-        r1 = np.array([[1, 0, 0], [0, np.cos(rads), -np.sin(rads)],
-            [0, np.sin(rads), np.cos(rads)]])
+        cosrads, sinrads = np.cos(rads), np.sin(rads)
+        r1 = np.array([[1, 0, 0], [0, cosrads, -sinrads], [0, sinrads, cosrads]])
         rads = np.deg2rad(par.angAP)
-        r2 = np.array([[np.cos(rads), 0, np.sin(rads)], [0, 1, 0],
-            [-np.sin(rads), 0, np.cos(rads)]])
+        cosrads, sinrads = np.cos(rads), np.sin(rads)
+        r2 = np.array([[cosrads, 0, sinrads], [0, 1, 0], [-sinrads, 0, cosrads]])
         rads = np.deg2rad(par.angFH)
-        r3 = np.array([[np.cos(rads), -np.sin(rads), 0],
-            [np.sin(rads), np.cos(rads), 0], [0, 0, 1]])
+        cosrads, sinrads = np.cos(rads), np.sin(rads)
+        r3 = np.array([[cosrads, -sinrads, 0], [sinrads, cosrads, 0], [0, 0, 1]])
         col = np.array([0, 0, 0, 1])[np.newaxis].T
-        R_tot = np.concatenate((np.concatenate((r1 * r2 * r3,
+        R_tot = np.concatenate((np.concatenate((r1.dot(r2).dot(r3),
             [np.zeros(3)])), col), axis=1)
     else:
         R_tot = np.eye(4)
@@ -62,7 +62,7 @@ def calc_angulation(par, angulation):
     p_orig = np.array([(par.dim[0] - 1) / 2, (par.dim[1] - 2) / 2,
         (par.dim[2] - 1) / 2, 1])
     offsetA = A_tot.dot(p_orig.T)
-    if angulation == 1:
+    if angulation:
         # trying to incorporate AP FH RL translation: determined using some
         # common sense, Chris Rordon's help + source code and trial and error,
         # this is considered EXPERIMENTAL!
