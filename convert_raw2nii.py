@@ -11,9 +11,8 @@ from spm_type import spm_type
 from write_nii import WriteNii
 
 
-def convert_raw2nii(filelist, prefix="", suffix="", pathpar="",
-        outfolder=None, outputformat=None, angulation=None,
-        rescale=None, dim=3, dti_revertb0=0):
+def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
+        angulation, rescale, dim, dti_revertb0):
     """
         filelist: list containing PAR file names (without path info) to convert
             into analyze/nifti
@@ -128,10 +127,10 @@ def convert_raw2nii(filelist, prefix="", suffix="", pathpar="",
                         logger.info('Write file: {0}-{1}'.format(outFileName,
                             '{0:03.0f}'.format(j)))
                 elif Parameters.ResToolsVersion in ('V4', 'V4.1', 'V4.2'):
-                    if angulation == 1:
+                    if angulation:
                         logger.warning("Assuming angulation parameters are "
                             "identical for all scans in (4D) volume!")
-                    if rescale == 1:
+                    if rescale:
                         logger.warning("Assuming rescaling parameters "
                             "(see PAR-file) are identical for all slices in "
                             "volume and all scans in (4D) volume!")
@@ -331,7 +330,7 @@ def convert_raw2nii(filelist, prefix="", suffix="", pathpar="",
 
 if __name__ == "__main__":
     logger = logging.getLogger('raw2nii')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     _formatter = logging.Formatter("%(levelname)s %(asctime)s %(filename)s: "
         "%(message)s")
     _stream_handler = logging.StreamHandler()
@@ -348,5 +347,10 @@ if __name__ == "__main__":
     parser.add_argument("--rescale", type=int, default=1)
     parser.add_argument("--dim", type=int, default=3)
     parser.add_argument("--dti_revertb0", type=int, default=0)
+    parser.add_argument("--debug", "-d", action="store_true")
     options = parser.parse_args()
-    convert_raw2nii(**vars(options))
+    if options.debug:
+        logger.setLevel(logging.DEBUG)
+    convert_raw2nii(options.filelist, options.prefix, options.suffix,
+        options.pathpar, options.outfolder, options.outputformat,
+        options.angulation, options.rescale, options.dim, options.dti_revertb0)
