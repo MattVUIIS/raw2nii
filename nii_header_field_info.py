@@ -36,7 +36,7 @@ class NiiHdrFieldInfo:
             logger.debug("Value: \"{0}\"".format(self.val))
         else:
             #logger.debug("Data: {0}".format(data))
-            self.val = struct.unpack_from(self.dtype, data)
+            self.val = struct.unpack_from(self.dtype, data)[0]
             logger.debug("Value: {0}".format(self.val))
         return self.val
 
