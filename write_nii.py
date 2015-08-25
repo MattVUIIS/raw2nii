@@ -44,14 +44,8 @@ def WriteNii(fname, NHdr, Data3D):
                             val, binascii.hexlify(packed.tobytes())))
                         packed.tofile(fid)
                 fid.flush()
-            if 8 == NHdr.bitpix.val:
-                bitpixstr = 'int8'
-            elif 16 == NHdr.bitpix.val:
-                bitpixstr = 'int16'
-            elif 32 == NHdr.bitpix.val:
-                bitpixstr = 'int32'
-            elif 64 == NHdr.bitpix.val:
-                bitpixstr = 'int64'
+            if NHdr.bitpix.val in (8, 16, 32, 64):
+                bitpixstr = 'int{0}'.format(NHdr.bitpix.val)
             #now add 4 extra bytes in space between header and offset for data
             #indicating that single .nii file ("n+1\0") rather than separate
             #img/hdr files were written. see http://nifti.nimh.nih.gov
