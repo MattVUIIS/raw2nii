@@ -8,7 +8,7 @@ import os
 import pprint
 import subprocess
 
-from nii_info import read_nii
+from tools.nii_info import read_nii
 
 
 def main(test_data_folder, test_folder, rtol, atol):
@@ -24,6 +24,7 @@ def main(test_data_folder, test_folder, rtol, atol):
     cmd = ["python", "convert_raw2nii.py", input_par, "--pathpar", path_par,
         "--outfolder", out_folder]
     logger.debug("Running command: {0}".format(cmd))
+    os.chdir("project")
     status = subprocess.call(cmd)
     if status != 0:
         logger.error("Error occurred")

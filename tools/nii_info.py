@@ -1,3 +1,5 @@
+import logging
+
 from nii_header_field_info import NiiHdrFieldInfo
 
 
