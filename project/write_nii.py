@@ -1,4 +1,3 @@
-from __future__ import division
 import binascii
 import logging
 import numpy as np
