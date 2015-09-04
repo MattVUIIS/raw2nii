@@ -1,6 +1,3 @@
-from __future__ import division
-
-
 kDT_BINARY = 1
 kDT_UNSIGNED_CHAR = 2
 kDT_SIGNED_SHORT = 4
