@@ -41,25 +41,41 @@ HEADER = [
 
 def read_nii_header(filename):
     logger = logging.getLogger('raw2nii')
-    header = {}
     with open(filename, 'rb') as f:
-        header_bytes = f.read(348)
-        for info in HEADER:
-            header[info.name] = info.read_value(header_bytes)
-            logger.info(info)
+        header = _read_nii_header(f, logger)
     return header
 
 def read_nii_body(filename):
     with open(filename, 'rb') as f:
-        f.read(348) #Header
-        body = bytes(f.read())
+        _skip_nii_header(f)
+        body = _read_nii_body(f)
     return body
 
 def read_nii(filename):
-    header = {}
     with open(filename, 'rb') as f:
-        header_bytes = f.read(348)
-        for info in HEADER:
-            header[info.name] = info.read_value(header_bytes)
-        body = bytes(f.read())
+        header = _read_nii_header(f)
+        body = _read_nii_body(f)
     return header, body
+
+def _read_nii_header(f, logger=None):
+    header = {}
+    header_bytes = f.read(348)
+    if len(header_bytes) == 348:
+        magic = header_bytes[-4:]
+    else:
+        magic = None
+    if magic not in (bytes('n+1\0'), bytes('ni1\0')):
+        if logger:
+            logger.info('magic number: {0}'.format(magic))
+        raise RuntimeError('This is not a NIFTI file!')
+    for info in HEADER:
+        header[info.name] = info.read_value(header_bytes)
+        if logger:
+            logger.info(info)
+    return header
+
+def _skip_nii_header(f):
+    f.read(348)
+
+def _read_nii_body(f):
+    return bytes(f.read())
