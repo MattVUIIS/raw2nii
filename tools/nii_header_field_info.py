@@ -22,9 +22,12 @@ class NiiHdrFieldInfo:
             count = reduce(lambda x, y: x * y, self.shape)
             arrdata = np.fromstring(data, dtype=self.dtype, count=count)
             logger.debug("Count: {0} Arrdata: {1}".format(count, arrdata))
-            self.val = arrdata.reshape(self.shape)
             if len(self.shape) > 1:
+                #Transpose matrices from Fortran order
+                self.val = arrdata.reshape(self.shape[::-1])
                 self.val = self.val.T
+            else:
+                self.val = arrdata.reshape(self.shape)
             logger.debug("Value: {0}".format(self.val))
         elif self.dtype == 's':
             self.val = ""
@@ -41,5 +44,5 @@ class NiiHdrFieldInfo:
         return self.val
 
     def __repr__(self):
-        return "Field {0}[{1}] (prec={2}, val='{3}')".format(self.name,
-            self.offset, self.dtype, self.val)
+        return "Field {0}[{1}] (val='{2}', prec={3})".format(self.name,
+            self.offset, self.val, self.dtype)
