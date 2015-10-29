@@ -36,22 +36,27 @@ def calc_angulation(par, angulation):
         lmm = np.eye(4)  # Do not rotate
         lXmm = par.fov_apfhrl[2] / par.dim[0]
         lYmm = par.fov_apfhrl[0] / par.dim[1]
+        #Use smallest in plane resolution...
         lXmm, lYmm = _set_larger(lXmm, lYmm)
         lZmm = par.fov_apfhrl[1] / par.dim[2]
     elif 2 == par.sliceorient:  # Sagittal
         lmm = np.array([[0, 0, -1, 0], [1, 0, 0, 0], [0, -1, 0, 0],
             [0, 0, 0, 1]])
-        lYmm = par.fov_apfhrl[0] / par.dim[0]
-        lZmm = par.fov_apfhrl[1] / par.dim[1]
-        lYmm, lZmm = _set_larger(lYmm, lZmm)
-        lXmm = par.fov_apfhrl[2] / par.dim[2]
+        #Vanderbilt override
+        lXmm = par.fov_apfhrl[0] / par.dim[0]
+        lYmm = par.fov_apfhrl[1] / par.dim[1]
+        #Use smallest in plane resolution...
+        lXmm, lYmm = _set_larger(lXmm, lYmm)
+        lZmm = par.fov_apfhrl[2] / par.dim[2]
     elif 3 == par.sliceorient:  # Coronal
         lmm = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0],
             [0, 0, 0, 1]])  # Rotate 90 degrees
-        lXmm = par.fov_apfhrl[2] / par.dim[0]
-        lZmm = par.fov_apfhrl[1] / par.dim[1]
-        lXmm, lZmm = _set_larger(lXmm, lZmm)
-        lYmm = par.fov_apfhrl[0] / par.dim[2]
+        #Vanderbilt override
+        lXmm = par.fov_apfhrl[1] / par.dim[0]
+        lYmm = par.fov_apfhrl[2] / par.dim[1]
+        #Use smallest in plane resolution...
+        lXmm, lYmm = _set_larger(lXmm, lYmm)
+        lZmm = par.fov_apfhrl[0] / par.dim[2]
     Zm = np.array([[lXmm, 0, 0, 0], [0, lYmm, 0, 0], [0, 0, lZmm, 0],
         [0, 0, 0, 1]])
     #realvoxsize is used to fill in pixdim nifti header info
