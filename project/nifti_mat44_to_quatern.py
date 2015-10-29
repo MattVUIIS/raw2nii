@@ -34,8 +34,9 @@ def nifti_mat44_to_quatern(A):
     # will result in the inverse orthogonal matrix at this point.
     # If we just orthogonalized the columns, this wouldn't necessarily hold.
     Q = A[0:3,0:3]
-    U, S ,V = np.linalg.svd(Q)
-    P = U.dot(V)
+    U, S, V = np.linalg.svd(Q)
+    #numpy's svd function transposes the V matrix compared to Matlab
+    P = U.dot(V.T)
     #                            [ r11 r12 r13 ]
     # at this point, the matrix  [ r21 r22 r23 ] is orthogonal
     #                            [ r31 r32 r33 ]

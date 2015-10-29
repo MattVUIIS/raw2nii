@@ -1,20 +1,21 @@
+#!/usr/bin/env python
+from __future__ import print_function
 import argparse
 import logging
+import pprint
 
 from nii_info import read_nii_header
 
 
 if __name__ == "__main__":
-    logger = logging.getLogger('raw2nii')
-    logger.setLevel(logging.INFO)
-    _formatter = logging.Formatter("%(levelname)s %(filename)s: %(message)s")
-    _stream_handler = logging.StreamHandler()
-    _stream_handler.setFormatter(_formatter)
-    logger.addHandler(_stream_handler)
     parser = argparse.ArgumentParser()
-    parser.add_argument("filename")
-    parser.add_argument("--debug", "-d", action="store_true")
+    parser.add_argument("filenames", nargs='+')
     options = parser.parse_args()
-    if options.debug:
-        logger.setLevel(logging.DEBUG)
-    read_nii_header(options.filename)
+    is_many = len(options.filenames) > 1
+    for filename in options.filenames:
+        if is_many:
+            print('{0}\n-----------------------------'.format(filename))
+        header = read_nii_header(filename)
+        pprint.pprint(header)
+        if is_many:
+            print('\n')
