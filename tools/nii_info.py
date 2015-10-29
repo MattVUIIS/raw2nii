@@ -1,12 +1,13 @@
 import logging
+import numpy as np
 
 from nii_header_field_info import NiiHdrFieldInfo
 
 
 HEADER = [
     NiiHdrFieldInfo('HdrSz', 0, 'i'),
-    NiiHdrFieldInfo('DataType', 4, 's'),
-    NiiHdrFieldInfo('db_name', 14, 's'),
+    NiiHdrFieldInfo('DataType', 4, 's', 10),
+    NiiHdrFieldInfo('db_name', 14, 's', 18),
     NiiHdrFieldInfo('extents', 32, 'i'),
     NiiHdrFieldInfo('session_error', 36, 'h'),
     NiiHdrFieldInfo('regular', 38, 'B'),
@@ -28,14 +29,14 @@ HEADER = [
     NiiHdrFieldInfo('slice_duration', 132, 'f'),
     NiiHdrFieldInfo('toffset', 136, 'f'),
     NiiHdrFieldInfo('glmaxmin', 140, 'i', (2,)),
-    NiiHdrFieldInfo('descrip', 148, 's'),
-    NiiHdrFieldInfo('aux_file', 228, 's'),
+    NiiHdrFieldInfo('descrip', 148, 's', 80),
+    NiiHdrFieldInfo('aux_file', 228, 's', 24),
     NiiHdrFieldInfo('qform_code', 252, 'h'),
     NiiHdrFieldInfo('sform_code', 254, 'h'),
     NiiHdrFieldInfo('quatern_bcd', 256, 'f', (3,)),
     NiiHdrFieldInfo('qoffset_xyz', 268, 'f', (3,)),
     NiiHdrFieldInfo('srow_xyz', 280, 'f', (4, 3)),
-    NiiHdrFieldInfo('intent_name', 328, 's'),
+    NiiHdrFieldInfo('intent_name', 328, 's', 16),
     NiiHdrFieldInfo('magic', 344, 'i'),
 ]
 
@@ -46,15 +47,17 @@ def read_nii_header(filename):
     return header
 
 def read_nii_body(filename):
+    logger = logging.getLogger('raw2nii')
     with open(filename, 'rb') as f:
-        _skip_nii_header(f)
-        body = _read_nii_body(f)
+        header = _read_nii_header(f, logger)
+        body = _read_nii_body(f, header, logger)
     return body
 
 def read_nii(filename):
+    logger = logging.getLogger('raw2nii')
     with open(filename, 'rb') as f:
-        header = _read_nii_header(f)
-        body = _read_nii_body(f)
+        header = _read_nii_header(f, logger)
+        body = _read_nii_body(f, header, logger)
     return header, body
 
 def _read_nii_header(f, logger=None):
@@ -72,10 +75,26 @@ def _read_nii_header(f, logger=None):
         header[info.name] = info.read_value(header_bytes)
         if logger:
             logger.info(info)
-    return header
+    return header 
 
-def _skip_nii_header(f):
-    f.read(348)
+def _read_nii_body(f, header, logger):
+    dim = header['dim'][1:5]
+    bitpix = header['bitpix']
+    datatype = header['datatype']
+    logger.debug('dimension: {0}'.format(dim))
+    logger.debug('bitpix: {0}'.format(bitpix))
+    logger.debug('datatype: {0}'.format(datatype))
+    unsigned_prefix = ('', 'u')[datatype ==
+        {8: 2, 16: 512, 32: 768, 64: 1280}[bitpix]]
+    dtype = '{0}int{1}'.format(unsigned_prefix, bitpix)
+    logger.debug('dtype: {0}'.format(dtype))
+    data_shape = (dim[0], dim[1], dim[2] * dim[3])
+    arr = np.fromstring(f.read(), dtype=dtype, count=np.product(data_shape))
+    logger.debug('Arr itemsize: {0}'.format(arr.itemsize))
+    logger.debug('Arr shape: {0}'.format(arr.shape))
+    logger.info('Data shape: {0}'.format(data_shape))
+    data = arr.reshape(data_shape[::-1]).T
+    logger.info('Data: {0}'.format(data))
+    body = {'data': data, 'dtype': dtype}
+    return body
 
-def _read_nii_body(f):
-    return bytes(f.read())

@@ -153,8 +153,10 @@ def read_par(parfilename):
                 if line.startswith("#"):  # End of image info
                     break
                 cols = line.strip().split()
-                #Grab first 11 cols, and 43rd for diffusion gradient number
-                row = [int(i) for i in cols[:11] + cols[42:43]]
+                #Grab first 11 cols, 43rd for diffusion gradient number,
+                #and then 42nd for inversion delay. We use [::-1] to reverse
+                #the slice containing indices element 42 and 43
+                row = [int(i) for i in cols[:11] + cols[41:43][::-1]]
                 #row = [col_types[i](x) for i, x in enumerate(cols, 0)]
                 if first_row is None:
                     first_row = cols
@@ -204,11 +206,12 @@ def read_par(parfilename):
                 slice_index = np.concatenate((slice_index, zeros), axis=1)
             if par.dyn > 1:
                 #estimate scan-duration from dtime PAR file row
-                par.RT = (float(last_row[32]) - float(first_row[32])) / (par.dyn
+                par.RT = (float(last_row[31]) - float(first_row[31])) / (par.dyn
                     - 1)
             else:
                 par.RT = np.nan
-            par.slice_index = slice_index[:,0:12]
+            r_s, r_i, s_s, issue = iterate_loadpar(parfilename)
+            par.slice_index = slice_index[:,0:13]
             #rectypes = [('slice_number', int), ('echo_number', int),
             #    ('dynamic_scan_number', int), ('cardiac_phase_number', int),
             #    ('image_type_mr', int), ('scanning_sequence', int),
@@ -226,8 +229,15 @@ def read_par(parfilename):
                 y = int(first_row[10])
                 z = par.slice
                 par.dim = np.array([x, y, z])
-                par.rescale_slope = 1 / float(first_row[13])
-                par.rescale_interc = float(first_row[11])
+                if issue:
+                    par.rescale_slope = r_s
+                    par.rescale_interc = r_i
+                    par.issue = True
+                    par.scale_slope = s_s
+                else:
+                    par.rescale_slope = 1 / float(first_row[13])
+                    par.rescale_interc = float(first_row[11])
+                    par.issue = False
                 par.bit = int(first_row[7])
                 par.slth = float(first_row[22])
                 par.gap = float(first_row[23])
@@ -245,6 +255,41 @@ def read_par(parfilename):
                     gen_info['Off Centre midslice(ap,fh,rl) [mm]'].split())
     logger.debug("PARInfo {0}".format(par))
     return par
+
+def iterate_loadpar(parfilename):
+    """
+        Parameters:
+            parfilename: fullpath to the par file
+        Returns:
+           rescaleSlope: an array of the rescaleSlope values
+           rescaleIntercept: an array of the rescaleIntercept values
+           scaleSlope: an array of the scalSlope values
+           issue: boolean of true if any of the arrays do not have 1 unique
+            element
+    """
+    logger = logging.getLogger('raw2nii')
+    scaleSlope = []
+    rescaleSlope = []
+    issue = False
+    rescaleIntercept = []
+    with open(parfilename, 'rb') as parfile:
+        line = None
+        while line != "":
+            line = parfile.readline()
+            if line.strip() == "":  # Empty line
+                continue
+            if line[0] != '.' and line[0] != '#':
+                test = line.split()[:20]
+                scaleSlope.append(float(test[13]))
+                rescaleSlope.append(float(test[12]))
+                rescaleIntercept.append(float(test[11]))
+    issue = (np.product(np.unique(scaleSlope).shape) != 1
+        or np.product(np.unique(rescaleIntercept).shape) != 1
+        or np.product(np.unique(rescaleSlope).shape) != 1)
+    if issue:
+        logger.warning('Multiple scaling factors detected. Switching to float '
+            '32 nifti and rescaling')
+    return rescaleSlope, rescaleIntercept, scaleSlope, issue
 
 if __name__ == "__main__":
     logger = logging.getLogger('raw2nii')

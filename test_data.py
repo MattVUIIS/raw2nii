@@ -1,12 +1,13 @@
 import argparse
-import bsdiff4
 import glob
 import logging
 import numpy as np
 import os
 import pprint
 import subprocess
+import tempfile
 
+from project import convert_raw2nii
 from tools.nii_info import read_nii
 
 
@@ -16,36 +17,37 @@ def main(test_data_folder, test_folder, rtol, atol):
         compares the NIFTI output
     """
     logger = logging.getLogger('raw2nii_test')
+    test_data_folder = os.path.abspath(test_data_folder)
     path_par = os.path.join(test_data_folder, test_folder, "PARREC")
     input_par = glob.glob("{0}/*.PAR".format(path_par))[0]
     out_folder = os.path.join("testOutput", test_folder, "NIFTI")
-    #Run NIFTI conversion script and output to testOutput directory
-    cmd = ["python", "convert_raw2nii.py", input_par, "--pathpar", path_par,
-        "--outfolder", out_folder]
-    logger.debug("Running command: {0}".format(cmd))
-    os.chdir("project")
-    status = subprocess.call(cmd)
-    if status != 0:
-        logger.error("Error occurred")
-        return 1
+    #Set up convert_raw2nii logger
+    raw2nii_logger = logging.getLogger('raw2nii')
+    #raw2nii_logger.setLevel(logging.DEBUG)
+    _formatter = logging.Formatter('%(levelname)s %(filename)s: %(message)s')
+    _stream_handler = logging.StreamHandler()
+    _stream_handler.setFormatter(_formatter)
+    raw2nii_logger.addHandler(_stream_handler)
+    #Run NIFTI conversion function and output to testOutput directory
+    output = convert_raw2nii(filelist=[input_par], prefix="", suffix="",
+        pathpar=path_par, outfolder=out_folder, outputformat=1, angulation=1,
+        rescale=1, dti_revertb0=0)
+    #Compare to the 4D data since we have the Vanderbilt override behavior
     test_nifti_folder = os.path.join(test_data_folder, test_folder, "NIFTI",
-        "3D")
+        "4D")
     #Produce listing of each file in NIFTI folders in lexographical order and
     #prepare each pair for comparison
     test_niftis = sorted(glob.glob("{0}/*.nii".format(test_nifti_folder)))
     output_niftis = sorted(glob.glob("{0}/*.nii".format(out_folder)))
+    if len(test_niftis) != len(output_niftis):
+        logger.error('Different number of output files! Test niftis: {0} '
+            'Output niftis: {1}'.format(pprint.pformat(test_niftis),
+            pprint.pformat(output_niftis)))
     output_pairs = zip(test_niftis, output_niftis)
-    #print("Test niftis: {0}".format(pprint.pformat(test_niftis)))
-    #print("Output niftis: {0}".format(pprint.pformat(output_niftis)))
-    #print("Output pairs: {0}".format(pprint.pformat(output_pairs)))
     for test_nifti, output_nifti in output_pairs:
         logger.info("Output pair: {0} -> {1}".format(test_nifti, output_nifti))
         test_header, test_body = read_nii(test_nifti)
         output_header, output_body = read_nii(output_nifti)
-        #logger.debug("Test header: {0}".format(pprint.pformat(test_header)))
-        #logger.debug("Test body: {0}".format(len(test_body)))
-        #logger.debug("Output header: {0}".format(pprint.pformat(output_header)))
-        #logger.debug("Output body: {0}".format(len(output_body)))
         #First compare the headers of the two niftis
         for test_key, test_val in test_header.items():
             output_val = output_header[test_key]
@@ -62,10 +64,28 @@ def main(test_data_folder, test_folder, rtol, atol):
                 logger.warning("header.{0} are different: {1} -> {2}".format(
                     test_key, test_val, output_val))
         #Then compare the bodies of the niftis
-        if test_body != output_body:
-            diff_output = bsdiff4.diff(test_body, output_body)
+        if(test_body['dtype'] != output_body['dtype']
+                or test_body['data'].shape != output_body['data'].shape
+                or not np.allclose(test_body['data'], output_body['data'])):
+            diff_output = body_diff_script(logger, test_body, output_body)
             logger.warning("Bodies are different: {0}".format(diff_output))
     return 0
+
+def body_diff_script(logger, test_body, output_body):
+    #Write out test binary data to a tempfile
+    test_bin_fd, test_bin_name = tempfile.mkstemp()
+    with os.fdopen(test_bin_fd, 'wb') as f:
+        test_body['data'].astype(test_body['dtype']).T.tofile(f)
+    #Write out canonical binary data to a tempfile
+    output_bin_fd, output_bin_name = tempfile.mkstemp()
+    with os.fdopen(output_bin_fd, 'wb') as f:
+        output_body['data'].astype(output_body['dtype']).T.tofile(f)
+    #Compare two tempfiles
+    #logger.warning("Bodies are different: {0} {1}".format(test_bin_name,
+    #    output_bin_name))
+    return subprocess.Popen(['tools/binary_diff.sh',
+        test_bin_name, output_bin_name],
+        stdout=subprocess.PIPE).communicate()[0]
 
 if __name__ == "__main__":
     logger = logging.getLogger('raw2nii_test')
