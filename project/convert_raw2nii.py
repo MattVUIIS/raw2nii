@@ -241,12 +241,12 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                             iSlices_sorted[-nslice+1:,:] = B0
                             #Keep only the number of volumes from par header
                             nr_diffgrads = NumberOfVolumes
-                            #Starting at zero, so +1
-                            b0moved = iSlices_sorted[-1,6] + 1 == Img_size
+                        #Starting at zero, so +1
+                        b0moved = iSlices_sorted[-1,6] + 1 == Img_size
                         #%%%%%%%%%%%%%%% WRITING BVAL/BVEC %%%%%%%%%%%%%%%%
                         #Write the bval after sorting the slices
-                        #Put the b0 first if needed from the iSliced_Sorted in the
-                        #bval and bvec
+                        #Put the b0 first if needed from the iSliced_Sorted in
+                        #the bval and bvec
                         volumeRange = list(range(NumberOfVolumes))
                         if b0moved:  # Write the last value first
                             logger.warning('VANDERBILT hack -> putting last '
@@ -280,10 +280,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                             logger.error('File name for bvec.txt invalid')
                         #%%%%%%%%%%%%%%%%
                     nr_bvalues = len(np.unique(iSlices_sorted[:,12]))
-                    #Always use 4D
-                    NewFile = np.zeros((iSlices_sorted.shape[0], 1))
-                    NewFile[-1] = 1
-                    #Guessing here on "type"
+                    #Always use 4D - Guessing here on "type"
                     expnrslices = (Dim[2] * nr_echos * max(nr_mrtypes,
                         nr_realmrtypes) * nr_diffgrads * nr_dyn)
                     bytes_required = expnrslices * Dim[0] * Dim[1] * 8
@@ -292,7 +289,8 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         "bytes required".format(bytes_required))
                     VolData = np.zeros((Dim[0], Dim[1], expnrslices))
                     slicenr = 0
-                    while nLine < iSlices_sorted.shape[0]:
+                    nRowSlices = iSlices_sorted.shape[0]
+                    while nLine < nRowSlices:
                         ID1.seek(iSlices_sorted[nLine,6] * cDim[0] * cDim[1]
                             * 2)
                         cDim = np.concatenate((iSlices_sorted[nLine,9:11],
@@ -311,7 +309,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 / (Parameters.scale_slope[slicenr]
                                 * Parameters.rescale_slope[slicenr]))
                         slicenr += 1
-                        if NewFile[nLine]:
+                        if (nLine + 1) % nRowSlices == 0:
                             if nr_dyn > 1:
                                 dyn_suffix = "-{0:04d}".format(
                                     iSlices_sorted[nLine,2])
@@ -358,8 +356,6 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 bval_ndsuffix = ""
                             cDim = np.concatenate((iSlices_sorted[nLine,9:11],
                                 [Dim[2]]))
-                            #nii_hdr_dim = np.array([dim, nr_dyn, nr_diffgrads,
-                            #    nr_echos, nr_mrtypes, nr_realmrtypes])
                             nii_hdr_dim = np.array([nr_dyn * nr_diffgrads *
                                 nr_echos * max(nr_mrtypes, nr_realmrtypes)])
                             NHdr = CreateNiiHdr(Parameters, angulation,
@@ -376,9 +372,6 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 nslice = Parameters.dim[2]
                                 #Last shall be first and first shall be last
                                 VolData = np.roll(VolData, nslice, 2)
-                                #B0 = np.copy(VolData[:,:,-nslice:])
-                                #VolData[:,:,nslice:] = VolData[:,:,0:-nslice]
-                                #VolData[:,:,0:nslice] = B0
                             VolNameSinExt = os.path.join(absDir, outFileName)
                             Slice = np.zeros((cDim[0], cDim[1]))
                             #Construct 4D transformation matrix from T
