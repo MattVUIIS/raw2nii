@@ -230,15 +230,13 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                             #Sorted the list to keep the b0 at the end
                             nslice = Parameters.dim[2]
                             #Get the first index for the b0
-                            index = []
-                            for i, e in enumerate(iSlices_sorted[:,12]):
-                                if e == 1:
-                                    index.append(i)
+                            r = iSlices_sorted[:,12]
+                            index = np.extract(r == 1, np.arange(r.shape[0]))
                             #Put the info at the end
-                            B0 = iSlices_sorted[index[0]:index[-1],:]
-                            iSlices_sorted[index[0]:index[-1],:] = (
+                            B0 = np.copy(iSlices_sorted[index,:])
+                            iSlices_sorted[index,:] = (
                                 iSlices_sorted[-nslice:,:])
-                            iSlices_sorted[-nslice+1:,:] = B0
+                            iSlices_sorted[-nslice:,:] = B0
                             #Keep only the number of volumes from par header
                             nr_diffgrads = NumberOfVolumes
                         #Starting at zero, so +1
