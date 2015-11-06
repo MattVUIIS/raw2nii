@@ -12,7 +12,10 @@ from tools.nii_info import read_nii
 
 
 DEFAULT_TEST_DATA = [
-    ('canonicalData', 'philips/philips_3T_achieva/fMRI/')
+    ('canonicalData', 'philips/philips_3T_achieva/fMRI/'),
+    ('canonicalData', 'philips/philips_3T_achieva/dti/'),
+    #('canonicalData', 'philips/philips_3T_achieva/b0map/'),
+    #('canonicalData', 'philips/philips_1_5T_intera/volume_2/'),
 ]
 
 
@@ -24,16 +27,9 @@ def run_test(canon_data_folder, trial_folder, rtol, atol):
     path_par = os.path.join(canon_data_folder, trial_folder, 'PARREC')
     input_par = glob.glob('{0}/*.PAR'.format(path_par))[0]
     test_folder = os.path.join('testOutput', trial_folder, 'NIFTI')
-    #Set up convert_raw2nii logger
-    raw2nii_logger = logging.getLogger('raw2nii')
-    #raw2nii_logger.setLevel(logging.DEBUG)
-    _formatter = logging.Formatter('test_data: %(levelname)s: %(message)s')
-    _stream_handler = logging.StreamHandler()
-    _stream_handler.setFormatter(_formatter)
-    raw2nii_logger.addHandler(_stream_handler)
     #Run NIFTI conversion function and output to testOutput directory
-    logger.info('Running test: parfile={0} path_par={1} test_folder={2}'.format(
-        input_par, path_par, test_folder))
+    logger.info('Running test: python convert_raw2nii.py {0} --pathpar={1} '
+        '--outfolder={2}'.format(input_par, path_par, test_folder))
     output = convert_raw2nii(filelist=[input_par], prefix='', suffix='',
         pathpar=path_par, outfolder=test_folder, outputformat=1, angulation=1,
         rescale=1, dti_revertb0=0)
@@ -103,6 +99,10 @@ if __name__ == '__main__':
         test_args = DEFAULT_TEST_DATA
     if options.debug:
         logger.setLevel(logging.DEBUG)
+    #Set up convert_raw2nii logger
+    raw2nii_logger = logging.getLogger('raw2nii')
+    #raw2nii_logger.setLevel(logging.DEBUG)
+    raw2nii_logger.addHandler(_stream_handler)
     for canon_data_folder, trial_folder in test_args:
         run_test(canon_data_folder, trial_folder, options.rel_tolerance,
             options.abs_tolerance)
