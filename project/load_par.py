@@ -40,7 +40,7 @@ def load_par(filename):
         raise IOError('{0} does not exist'.format(filename))
     par, vars, slicevars = get_default_parvars()
     imgTagFormat = collections.defaultdict(list)
-    doneslices = 0
+    doneslices = False
     read_state = _READ_STATE_DEFAULT
     with open(filename, 'rb') as fp:
         for line in fp:
@@ -72,7 +72,7 @@ def load_par(filename):
                 else:  # parse as image slice information
                     par = parseScanImgLine(par, line, imgTagFormat)
                     if not doneslices:
-                        doneslices = 1
+                        doneslices = True
                         par.fmt.append(('SLICES',))
             elif read_state == _READ_STATE_INFO_DEF:
                 par.fmt.append(('comment', line))
@@ -156,28 +156,19 @@ def load_par(filename):
     for j, s in enumerate(par.img):
         SRT[j,] = [s['info']['dynamic_scan_num'][0],
             s['info']['slice_num'][0], j]
-    #SRT = np.argsort(SRT)
-    SRT = SRT[np.lexsort((SRT[:,0], SRT[:,1], SRT[:,2]))]
-    is_in_volume_order = True
-    for i, e in enumerate(SRT[:,2]):
-        if i != e:
-            is_in_volume_order = False
-            break
+    SRT = SRT[np.lexsort((SRT[:,2], SRT[:,1], SRT[:,0]))]
+    is_in_volume_order = np.all(SRT[:,2] == np.arange(N))
     if is_in_volume_order:
         par.inputVolumeSliceOrder = 'volume'
     else:
-        SRT = SRT[np.lexsort((SRT[:,1], SRT[:,0], SRT[:,2]))]
-        is_in_slice_order = True
-        for i, e in enumerate(SRT[:,2]):
-            if i != e:
-                is_in_slice_order = False
-                break
-        if is_in_slice_order:
+        SRT = SRT[np.lexsort((SRT[:,2], SRT[:,0], SRT[:,1]))]
+        is_in_volume_order = np.all(SRT[:,2] == np.arange(N))
+        if is_in_volume_order:
             par.inputVolumeSliceOrder = 'slice'
         else:
             par.inputVolumeSliceOrder = 'unknown'
             logger.warning('Slice ordering is not a predefined type.')
-            logger.info('This toolbox is compatalbe with arbitrary '
+            logger.info('This toolbox is compatible with arbitrary '
                 'ordering of slices in PAR/REC files.')
             logger.info('However, other toolboxes or REC readers may '
                 'assume a specific ordering.')

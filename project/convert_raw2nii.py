@@ -184,7 +184,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                     fileposSlice_sorted = np.cumsum(bytespslice_sorted)
                     fileposSlice_sorted = np.concatenate(([0],
                         fileposSlice_sorted[:-1]))
-                    index_orig = np.array(range(0, len(order_slices)))
+                    index_orig = np.arange(order_slices.shape[0])
                     fileposSlice = fileposSlice_sorted[index_orig[i]]
                     #Add column containing start position in bytes of this slice
                     #in the file
@@ -203,22 +203,22 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         ('recon_resolution_y', int),
                         ('diffusion_b_value_number', int)]
                     #par.slice_index_as_rec = np.rec.fromrecords(rows, dtype=rectypes)
-                    iSlices_sorted = iSlice[
-                        np.lexsort((iSlice[:,0], iSlice[:,2], iSlice[:,12],
-                        iSlice[:,11], iSlice[:,1], iSlice[:,4], iSlice[:,5]))]
+                    iSlices_sorted = iSlice[np.lexsort((iSlice[:,0],
+                        iSlice[:,2], iSlice[:,12], iSlice[:,11], iSlice[:,1],
+                        iSlice[:,4], iSlice[:,5]))]
                     nLine = 0
                     #Determine number of interleaved image sequences (was:types,
                     #name kept for historic reasons) (e.g. angio)
-                    nr_mrtypes = len(np.unique(iSlices_sorted[:,5]))
+                    nr_mrtypes = np.unique(iSlices_sorted[:,5]).shape[0]
                     #Determine number of interleaved echos
-                    nr_echos = len(np.unique(iSlices_sorted[:,1]))
+                    nr_echos = np.unique(iSlices_sorted[:,1]).shape[0]
                     #Determine number of interleaved image types (e.g. angio)
-                    nr_realmrtypes = len(np.unique(iSlices_sorted[:,4]))
+                    nr_realmrtypes = np.unique(iSlices_sorted[:,4]).shape[0]
                     #Determine number of diffusion gradients (e.g. DTI)
-                    nr_diffgrads = len(np.unique(iSlices_sorted[:,11]))
+                    nr_diffgrads = np.unique(iSlices_sorted[:,11]).shape[0]
                     #Determine number of dynamics(directly from slice lines in
                     #PAR file instead of PAR file header info!)
-                    nr_dyn = len(np.unique(iSlices_sorted[:,2]))
+                    nr_dyn = np.unique(iSlices_sorted[:,2]).shape[0]
                     if nr_dyn != Parameters.dyn:
                         files_error_size.append(nbf)
                     if dti_revertb0:
@@ -290,16 +290,15 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                     VolData = np.zeros((Dim[0], Dim[1], expnrslices))
                     slicenr = 0
                     nRowSlices = iSlices_sorted.shape[0]
+                    type_map = {8: 'b', 16: 'h', 32: 'i'}
                     while nLine < nRowSlices:
                         ID1.seek(iSlices_sorted[nLine,6] * cDim[0] * cDim[1]
                             * 2)
                         cDim = np.concatenate((iSlices_sorted[nLine,9:11],
                             [Dim[2]]))
-                        type_map = {8: 'b', 16: 'h', 32: 'i'}
                         SliceData = array.array(type_map[Parameters.bit])
                         SliceData.fromfile(ID1, cDim[0] * cDim[1])
-                        ImageSlice = np.reshape(SliceData, (cDim[0], cDim[1]),
-                            order='F')
+                        ImageSlice = np.reshape(SliceData, cDim[0:2]).T
                         if not Parameters.issue:
                             VolData[:,:,slicenr] = ImageSlice
                         else:
@@ -373,7 +372,6 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 #Last shall be first and first shall be last
                                 VolData = np.roll(VolData, nslice, 2)
                             VolNameSinExt = os.path.join(absDir, outFileName)
-                            Slice = np.zeros((cDim[0], cDim[1]))
                             #Construct 4D transformation matrix from T
                             #(translation) and Zm (zoom, from voxel size), and
                             #rotation. Write data to img or nii file
