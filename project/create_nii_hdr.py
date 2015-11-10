@@ -52,7 +52,7 @@ def CreateNiiHdr(par, angulation=None, dim=None):
         NHdr.datatype = NiiHdrField(_DATATYPE_TABLE[par.bit], 'h')
         NHdr.bitpix = NiiHdrField(par.bit, 'h')
     else:
-        NHdr.datatype = NiiHdrField(nifti_defines.kDT_SIGNED_SHORT, 'h')
+        NHdr.datatype = NiiHdrField(nifti_defines.kDT_FLOAT, 'h')
         NHdr.bitpix = NiiHdrField(32, 'h')
     NHdr.slice_start = NiiHdrField(0, 'h')
     #vox_offset=352.0 means that the data starts immediately after the NIFTI-1
