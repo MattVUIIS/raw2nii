@@ -71,9 +71,9 @@ def calc_angulation(par, angulation):
         # trying to incorporate AP FH RL translation: determined using some
         # common sense, Chris Rordon's help + source code and trial and error,
         # this is considered EXPERIMENTAL!
-        A_tot[0:3,3] = (np.array([-offsetA[0], -offsetA[1], -offsetA[2]])
-            - np.array([par.offRL, par.offAP, -par.offFH]))
+        A_tot[0:3,3] = [-offsetA[0] - par.offRL,
+            -offsetA[1] - par.offAP, -offsetA[2] + par.offFH]
     else:
-        A_tot[0:3,3] = np.array([-offsetA[0], -offsetA[1], -offsetA[2]])
+        A_tot[0:3,3] = [-offsetA[0], -offsetA[1], -offsetA[2]]
     HdrMat = A_tot
     return HdrMat, realvoxsize
