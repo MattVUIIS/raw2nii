@@ -7,9 +7,9 @@ import pprint
 from nii_info import read_nii_header
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("filenames", nargs='+')
+    parser.add_argument('filenames', nargs='+')
     options = parser.parse_args()
     is_many = len(options.filenames) > 1
     for filename in options.filenames:
