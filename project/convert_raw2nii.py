@@ -268,10 +268,12 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                             with open(bvec_filename, 'wb') as bvec_file:
                                 bvec_file.writelines('{0:.6f}'.format(x) + ' '
                                     for x in bvec[volumeRange,0])
+                                bvec_file.write('\n')
                                 #After checking the dtiqa process, need to flip
                                 #Y data (so minus)
                                 bvec_file.writelines('{0:.6f}'.format(-x) + ' '
                                     for x in bvec[volumeRange,1])
+                                bvec_file.write('\n')
                                 bvec_file.writelines('{0:.6f}'.format(x) + ' '
                                     for x in bvec[volumeRange,2])
                         except OSError:
