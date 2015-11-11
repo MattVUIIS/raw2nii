@@ -7,7 +7,6 @@ import os
 import re
 
 from create_nii_hdr import CreateNiiHdr
-from load_par import load_par
 from read_par import read_par
 from spm_type import spm_type
 from write_nii import WriteNii
@@ -47,40 +46,32 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
     count_error = 1
     for nbf, parfilename in enumerate(filelist):
         full_parfilename = os.path.join(pathpar, parfilename)
-        Parameters = read_par(full_parfilename)
         #extract the bval and bvec from the PAR file
-        par_file_data = load_par(full_parfilename);
-        if np.allclose(par_file_data['diffusion']['diffusion'][0], 1): #it's a dti file
+        Parameters = read_par(full_parfilename)
+        if np.allclose(Parameters.gen_info.diffusion, 1): #it's a dti file
             dti_revertb0 = 1
-            NumberOfVolumes = par_file_data.NumberOfVolumes
-            Img_size = len(par_file_data.img)
-            numberofslices_from_header = par_file_data['max']['num_slices']
+            NumberOfVolumes = Parameters.NumberOfVolumes
+            Img_size = Parameters.slices.shape[0]
+            numberofslices_from_header = (
+                Parameters.gen_info.max_number_of_slices_locations)
             numberofslices = Img_size // NumberOfVolumes
             bval = np.zeros((NumberOfVolumes, 1))
             bvec = np.zeros((NumberOfVolumes, 3))
             if not np.allclose(numberofslices_from_header, numberofslices):
                 logger.warning('DTI incomplete. Number of slices different '
                     'from header and reality.')
-                for volumeIndex in range(NumberOfVolumes - 1):
-                    special = par_file_data.img[volumeIndex
-                        * numberofslices_from_header]['special']
-                    bval[volumeIndex, 0] = special['diffusion_b_factor']
-                    # ap fh rl -> rl ap fh
-                    ap_fh_lr = special['diffusion_ap_fh_lr']
-                    bvec[volumeIndex, 0] = ap_fh_lr[2]
-                    bvec[volumeIndex, 1] = ap_fh_lr[0]
-                    bvec[volumeIndex, 2] = ap_fh_lr[1]
-            else:
-                #No error with the number of slices
-                for volumeIndex in range(NumberOfVolumes - 1):
-                    special = par_file_data.img[volumeIndex
-                        * numberofslices]['special']
-                    bval[volumeIndex, 0] = special['diffusion_b_factor']
-                    # ap fh rl -> rl ap fh
-                    ap_fh_lr = special['diffusion_ap_fh_lr']
-                    bvec[volumeIndex, 0] = ap_fh_lr[2]
-                    bvec[volumeIndex, 1] = ap_fh_lr[0]
-                    bvec[volumeIndex, 2] = ap_fh_lr[1]
+                sl_i = np.arange(0, NumberOfVolumes *
+                    numberofslices_from_header, numberofslices_from_header)
+            else:  # No error with the number of slices
+                sl_i = np.arange(0, NumberOfVolumes * numberofslices,
+                    numberofslices)
+            for volumeIndex in range(NumberOfVolumes):
+                sl = Parameters.slices[sl_i[volumeIndex]]
+                bval[volumeIndex, 0] = sl.diffusion_b_factor
+                # ap fh rl -> rl ap fh
+                bvec[volumeIndex, 0] = sl.diffusion_rl
+                bvec[volumeIndex, 1] = sl.diffusion_ap
+                bvec[volumeIndex, 2] = sl.diffusion_fh
         if Parameters.problemreading == 1:
             logger.warning('Skipping volume {0} because of reading errors.'
                 .format(full_parfilename))
@@ -112,7 +103,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                 VolData = np.zeros((Dim[0], Dim[1], Dim[2]))
                 Type = spm_type(Precision)
                 Offset = 0
-                Descrip = Parameters.name
+                Descrip = Parameters.gen_info.protocol_name
                 Scale = 1
                 Orign = Parameters.fov / Vox / 2
                 BytesPerValue = Parameters.bit // 8
@@ -120,20 +111,21 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                     nii_hdr_dim = np.array([dim, 1, 1, 1, 1, 1])
                     NHdr = CreateNiiHdr(Parameters, angulation, nii_hdr_dim)
                     logger.info('Start to convert scan: {0}'.format(Recfile))
-                    for j in range(1, Parameters.dyn):
-                        if 1 == Parameters.slices_sorted:
+                    for j in range(1, Parameters.gen_info.max_number_of_dynamics):
+                        if 1 == Parameters.slices_sorted:  # Ascending order
                             Data = ID1.read(chunk_size)
                             Inputvolume = np.zeros((Parameters.dim(1),
                                 Parameters.dim(0), Parameters.dim(2)))
                             Inputvolume = np.reshape(Data, (Parameters.dim(1),
                                 Parameters.dim(0), Parameters.dim(2)))
-                        elif 2 == Parameters.slicessorted:
+                        elif 2 == Parameters.slicessorted:  # Descending order
                             InputVolume = None #clear('InputVolume')
                             Inputvolume = np.zeros((Parameters.dim(1),
                                 Parameters.dim(0), Parameters.dim(2)))
                             for slice_ in range(1, Parameters.dim(2)):
-                                ID1.seek((j - 1 + Parameters.dyn * (slice_ - 1))
-                                    * SizeSlice * BytesPerValue)
+                                ID1.seek((j - 1 +
+                                    Parameters.gen_info.max_number_of_dynamics *
+                                    (slice_ - 1)) * SizeSlice * BytesPerValue)
                                 Inputvolume[:,:,slice_] = ID1.read(slice_size)
                             Inputvolume = np.reshape(Inputvolume,
                                 (Parameters.dim(1), Parameters.dim(0),
@@ -171,25 +163,33 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         logger.warning("Assuming rescaling parameters "
                             "(see PAR-file) are identical for all slices in "
                             "volume and all scans in (4D) volume!")
-                    iSlice = Parameters.slice_index
+                    iSlice = Parameters.slices
                     #add column containing size of slice in bytes
-                    iSlice = np.concatenate((iSlice, (iSlice[:,7] *
-                        iSlice[:,9] * iSlice[:,10] // 8)[np.newaxis].T), axis=1)
+                    #byte_size = np.array(iSlice.image_pixel_size *
+                    #    iSlice.recon_resolution_x * iSlice.recon_resolution_y //
+                    #    8)
+                    #bytespslice = np.concatenate((
+                    #    iSlice.slice_number[np.newaxis].T,
+                    #    byte_size[np.newaxis].T), axis=1)
+                    #bytespslice = np.concatenate((iSlice.slice_number[np.newaxis].T,
+                    #    (iSlice.image_pixel_size *
+                    #    iSlice.recon_resolution_x * iSlice.recon_resolution_y //
+                    #    8)[np.newaxis].T), axis=1)
                     #get order in which slices are stored in REC file.
-                    order_slices = iSlice[:,6]
-                    i = np.argsort(order_slices)
-                    order_slices = np.sort(order_slices)  # sort them
+                    #order_slices = iSlice.index_in_rec_file
+                    #i = np.argsort(order_slices)
+                    #order_slices = np.sort(order_slices)  # sort them
                     #sort bytes per slice info acc. to index in REC file
-                    bytespslice_sorted = iSlice[i,13]
-                    fileposSlice_sorted = np.cumsum(bytespslice_sorted)
-                    fileposSlice_sorted = np.concatenate(([0],
-                        fileposSlice_sorted[:-1]))
-                    index_orig = np.arange(order_slices.shape[0])
-                    fileposSlice = fileposSlice_sorted[index_orig[i]]
+                    #bytespslice_sorted = iSlice[i,13]
+                    #fileposSlice_sorted = np.cumsum(bytespslice_sorted)
+                    #fileposSlice_sorted = np.concatenate(([0],
+                    #    fileposSlice_sorted[:-1]))
+                    #index_orig = np.arange(order_slices.shape[0])
+                    #fileposSlice = fileposSlice_sorted[index_orig[i]]
                     #Add column containing start position in bytes of this slice
                     #in the file
-                    iSlice = np.concatenate((iSlice,
-                        fileposSlice[np.newaxis].T), axis=1)
+                    #iSlice = np.concatenate((iSlice,
+                    #    fileposSlice[np.newaxis].T), axis=1)
                     #Now sort entire slice_index according to dynamics, diff.
                     #gradient(fastest varying) and mr_type parameters (slowest
                     #varying). To do this we must convert to recarray for
@@ -202,24 +202,29 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         ('scan_percentage', int), ('recon_resolution_x', int),
                         ('recon_resolution_y', int),
                         ('diffusion_b_value_number', int)]
-                    #par.slice_index_as_rec = np.rec.fromrecords(rows, dtype=rectypes)
-                    iSlices_sorted = iSlice[np.lexsort((iSlice[:,0],
-                        iSlice[:,2], iSlice[:,12], iSlice[:,11], iSlice[:,1],
-                        iSlice[:,4], iSlice[:,5]))]
+                    iSlices_sorted = iSlice[np.lexsort((iSlice.slice_number,
+                        iSlice.dynamic_scan_number,
+                        iSlice.diffusion_b_value_number,
+                        iSlice.gradient_orientation_number, iSlice.echo_number,
+                        iSlice.image_type_mr, iSlice.scanning_sequence))]
                     nLine = 0
                     #Determine number of interleaved image sequences (was:types,
                     #name kept for historic reasons) (e.g. angio)
-                    nr_mrtypes = np.unique(iSlices_sorted[:,5]).shape[0]
+                    nr_mrtypes = np.unique(iSlices_sorted.scanning_sequence
+                        ).shape[0]
                     #Determine number of interleaved echos
-                    nr_echos = np.unique(iSlices_sorted[:,1]).shape[0]
+                    nr_echos = np.unique(iSlices_sorted.echo_number).shape[0]
                     #Determine number of interleaved image types (e.g. angio)
-                    nr_realmrtypes = np.unique(iSlices_sorted[:,4]).shape[0]
+                    nr_realmrtypes = np.unique(iSlices_sorted.image_type_mr
+                        ).shape[0]
                     #Determine number of diffusion gradients (e.g. DTI)
-                    nr_diffgrads = np.unique(iSlices_sorted[:,11]).shape[0]
+                    nr_diffgrads = np.unique(
+                        iSlices_sorted.gradient_orientation_number).shape[0]
                     #Determine number of dynamics(directly from slice lines in
                     #PAR file instead of PAR file header info!)
-                    nr_dyn = np.unique(iSlices_sorted[:,2]).shape[0]
-                    if nr_dyn != Parameters.dyn:
+                    nr_dyn = np.unique(iSlices_sorted.dynamic_scan_number
+                        ).shape[0]
+                    if nr_dyn != Parameters.gen_info.max_number_of_dynamics:
                         files_error_size.append(nbf)
                     if dti_revertb0:
                         if nr_diffgrads != NumberOfVolumes:
@@ -230,17 +235,17 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                             #Sorted the list to keep the b0 at the end
                             nslice = Parameters.dim[2]
                             #Get the first index for the b0
-                            r = iSlices_sorted[:,12]
+                            r = iSlices_sorted.diffusion_b_value_number
                             index = np.extract(r == 1, np.arange(r.shape[0]))
                             #Put the info at the end
-                            B0 = np.copy(iSlices_sorted[index,:])
-                            iSlices_sorted[index,:] = (
-                                iSlices_sorted[-nslice:,:])
-                            iSlices_sorted[-nslice:,:] = B0
+                            B0 = np.copy(sl)
+                            iSlices_sorted[index] = iSlices_sorted[-nslice:]
+                            iSlices_sorted[-nslice:] = B0
                             #Keep only the number of volumes from par header
                             nr_diffgrads = NumberOfVolumes
                         #Starting at zero, so +1
-                        b0moved = iSlices_sorted[-1,6] + 1 == Img_size
+                        b0moved = (iSlices_sorted[-1].index_in_rec_file + 1 ==
+                            Img_size)
                         #%%%%%%%%%%%%%%% WRITING BVAL/BVEC %%%%%%%%%%%%%%%%
                         #Write the bval after sorting the slices
                         #Put the b0 first if needed from the iSliced_Sorted in
@@ -279,7 +284,8 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         except OSError:
                             logger.error('File name for bvec.txt invalid')
                         #%%%%%%%%%%%%%%%%
-                    nr_bvalues = len(np.unique(iSlices_sorted[:,12]))
+                    nr_bvalues = np.unique(
+                        iSlices_sorted.diffusion_b_value_number).shape[0]
                     #Always use 4D - Guessing here on "type"
                     expnrslices = (Dim[2] * nr_echos * max(nr_mrtypes,
                         nr_realmrtypes) * nr_diffgrads * nr_dyn)
@@ -292,10 +298,10 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                     nRowSlices = iSlices_sorted.shape[0]
                     type_map = {8: 'b', 16: 'h', 32: 'i'}
                     while nLine < nRowSlices:
-                        ID1.seek(iSlices_sorted[nLine,6] * cDim[0] * cDim[1]
-                            * 2)
-                        cDim = np.concatenate((iSlices_sorted[nLine,9:11],
-                            [Dim[2]]))
+                        sl = iSlices_sorted[nLine]
+                        ID1.seek(sl.index_in_rec_file * cDim[0] * cDim[1] * 2)
+                        cDim = np.array([sl.recon_resolution_x,
+                            sl.recon_resolution_y, Dim[2]])
                         SliceData = array.array(type_map[Parameters.bit])
                         SliceData.fromfile(ID1, cDim[0] * cDim[1])
                         ImageSlice = np.reshape(SliceData, cDim[0:2]).T
@@ -311,21 +317,21 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         if (nLine + 1) % nRowSlices == 0:
                             if nr_dyn > 1:
                                 dyn_suffix = "-{0:04d}".format(
-                                    iSlices_sorted[nLine,2])
+                                    sl.dynamic_scan_number)
                                 dyn_ndsuffix = "-d{0:04d}".format(nr_dyn)
                             else:
                                 dyn_suffix = "-{0:04d}".format(1)
                                 dyn_ndsuffix = ""
                             if nr_mrtypes > 1:
                                 mrtype_suffix = "-s{0:3d}".format(
-                                    iSlices_sorted[nLine,5])
+                                    sl.scanning_sequence)
                                 mrtype_ndsuffix = "-s{0:03d}".format(nr_mrtypes)
                             else:
                                 mrtype_suffix = ""
                                 mrtype_ndsuffix = ""
                             if nr_realmrtypes > 1:
                                 realmrtype_suffix = "-t{0:03d}".format(
-                                    iSlices_sorted[nLine,4])
+                                    sl.image_type_mr)
                                 realmrtype_ndsuffix = "-t{0:03d}".format(
                                     nr_realmrtypes)
                             else:
@@ -333,14 +339,14 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 realmrtype_ndsuffix = ""
                             if nr_echos > 1:
                                 echo_suffix = "-e{0:03d}".format(
-                                    iSlices_sorted[nLine,1])
+                                    sl.echo_number)
                                 echo_ndsuffix = "-e{0:03d}".format(nr_echos)
                             else:
                                 echo_suffix = ""
                                 echo_ndsuffix = ""
                             if nr_diffgrads > 1:
                                 diffgrad_suffix = "-g{0:03d}".format(
-                                    iSlices_sorted[nLine,11])
+                                    sl.gradient_orientation_number)
                                 diffgrad_ndsuffix = "-g{0:03d}".format(
                                     nr_diffgrads)
                             else:
@@ -348,13 +354,11 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 diffgrad_ndsuffix = ""
                             if nr_bvalues > 1:
                                 bval_suffix = "-b{0:03d}".format(
-                                    iSlices_sorted[nLine,12])
+                                    sl.diffusion_b_value_number)
                                 bval_ndsuffix = "-b{0:03d}".format(nr_bvalues)
                             else:
                                 bval_suffix = ""
                                 bval_ndsuffix = ""
-                            cDim = np.concatenate((iSlices_sorted[nLine,9:11],
-                                [Dim[2]]))
                             nii_hdr_dim = np.array([nr_dyn * nr_diffgrads *
                                 nr_echos * max(nr_mrtypes, nr_realmrtypes)])
                             NHdr = CreateNiiHdr(Parameters, angulation,

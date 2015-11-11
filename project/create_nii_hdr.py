@@ -72,7 +72,7 @@ def CreateNiiHdr(par, angulation=None, dim=None):
     NHdr.toffset = NiiHdrField(0, 'f')
     NHdr.glmaxmin = NiiHdrField(np.array([255, 0]), 'i')
     #Max 80 characters, left justify with spaces
-    descrip = '{0}; converted by raw2nii {1}'.format(par.name,
+    descrip = '{0}; converted by raw2nii {1}'.format(par.gen_info.protocol_name,
         raw2nii_version.VERSION)[:80].ljust(80)
     NHdr.descrip = NiiHdrField(descrip, 's')
     NHdr.aux_file = NiiHdrField(_FILLER_CHAR * 24, 's')
