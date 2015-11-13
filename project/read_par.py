@@ -70,18 +70,18 @@ def read_par(parfilename):
                     gen_info.max_number_of_dynamics - 1)
             else:
                 par.RT = np.nan
-            par.issue = (np.product(np.unique(par.slices.scale_slope).shape) != 1
-                or np.product(np.unique(par.slices.rescale_intercept).shape) != 1
-                or np.product(np.unique(par.slices.rescale_slope).shape) != 1)
-            if par.issue:
-                logger.warning('Multiple scaling factors detected. Switching '
-                    'to float 32 nifti and rescaling')
             par.sliceorient = first_row.slice_orientation
             x = first_row.recon_resolution_x
             y = first_row.recon_resolution_y
             z = gen_info.max_number_of_slices_locations
             par.dim = np.array([x, y, z])
-            if par.issue:
+            par.multi_scaling_factors = (
+                np.product(np.unique(par.slices.scale_slope).shape) != 1
+                or np.product(np.unique(par.slices.rescale_intercept).shape) != 1
+                or np.product(np.unique(par.slices.rescale_slope).shape) != 1)
+            if par.multi_scaling_factors:
+                logger.warning('Multiple scaling factors detected. Switching '
+                    'to float 32 nifti and rescaling')
                 par.rescale_slope = slices.rescale_slope
                 par.rescale_interc = slices.rescale_intercept
                 par.scale_slope = slices.scale_slope
@@ -102,7 +102,7 @@ def read_par(parfilename):
             par.offAP, par.offFH, par.offRL = gen_info.off_centre_midslice
     _check_number_of_volumes(par)
     _check_slice_orientation(par)
-    #_check_slice_order(par)
+    _check_slice_order(par)
     logger.debug('PARFile {0}'.format(par))
     return par
 
@@ -193,7 +193,9 @@ def _check_number_of_volumes(par):
     if NoV != par.NumberOfVolumes:
         logger.warning('Dynamic Scan Number does not match number of '
             'slices. Assuming slices are ordered.')
-        cnt = np.zeros((max(slices.slice_number),))
+        #This code, transcribed from original override, is not quite right
+        #It also seems nonessential
+        #cnt = np.zeros((max(slices.slice_number),))
         #for s in slices:
         #    cnt[s.slice_number - 1] += 1
         #    s.dynamic_scan_number = cnt[s.slice_number - 1]

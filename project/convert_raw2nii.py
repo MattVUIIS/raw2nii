@@ -6,10 +6,9 @@ import numpy as np
 import os
 import re
 
-from create_nii_hdr import CreateNiiHdr
+from nii import create_nii_header, write_nii
 from read_par import read_par
 from spm_type import spm_type
-from write_nii import WriteNii
 
 
 def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
@@ -109,7 +108,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                 BytesPerValue = Parameters.bit // 8
                 if 'V3' == Parameters.ResToolsVersion:
                     nii_hdr_dim = np.array([dim, 1, 1, 1, 1, 1])
-                    NHdr = CreateNiiHdr(Parameters, angulation, nii_hdr_dim)
+                    NHdr = create_nii_header(Parameters, angulation, nii_hdr_dim)
                     logger.info('Start to convert scan: {0}'.format(Recfile))
                     for j in range(1, Parameters.gen_info.max_number_of_dynamics):
                         if 1 == Parameters.slices_sorted:  # Ascending order
@@ -135,7 +134,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         if 1 == outputformat:
                             VolName = VolNameSinExt + '.nii'
                             logger.info('Writing file: {0}...'.format(VolName))
-                            WriteNii(VolName, NHdr, Inputvolume)
+                            write_nii(VolName, NHdr, Inputvolume)
                             logger.info('  ...done')
                             outfiles.append(VolName)
                         elif 2 == outputformat:
@@ -305,7 +304,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                         SliceData = array.array(type_map[Parameters.bit])
                         SliceData.fromfile(ID1, cDim[0] * cDim[1])
                         ImageSlice = np.reshape(SliceData, cDim[0:2]).T
-                        if not Parameters.issue:
+                        if not Parameters.multi_scaling_factors:
                             VolData[:,:,slicenr] = ImageSlice
                         else:
                             VolData[:,:,slicenr] = ((ImageSlice
@@ -361,7 +360,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                                 bval_ndsuffix = ""
                             nii_hdr_dim = np.array([nr_dyn * nr_diffgrads *
                                 nr_echos * max(nr_mrtypes, nr_realmrtypes)])
-                            NHdr = CreateNiiHdr(Parameters, angulation,
+                            NHdr = create_nii_header(Parameters, angulation,
                                 nii_hdr_dim)
                             if dti_revertb0:
                                 #Do a very dirty dti hack, putting b0 first
@@ -381,7 +380,7 @@ def convert_raw2nii(filelist, prefix, suffix, pathpar, outfolder, outputformat,
                             #rotation. Write data to img or nii file
                             VolName = VolNameSinExt + '.nii'
                             logger.info("Writing file: {0}...".format(VolName))
-                            WriteNii(VolName, NHdr, VolData, Parameters.issue)
+                            write_nii(VolName, NHdr, VolData)
                             logger.info("  ...done")
                             outfiles.append((VolName, VolData))
                             slicenr = 0
