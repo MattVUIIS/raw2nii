@@ -1,7 +1,10 @@
 from __future__ import division
+import array
 import binascii
+import itertools
 import logging
 import numpy as np
+import os
 import struct
 
 import nifti_defines
@@ -9,7 +12,7 @@ import raw2nii_version
 from NiiFile import NiiHdr, NiiHdrField, HEADER_FIELD_NAMES
 
 
-__all__ = ['NiiHdr', 'NiiHdrField', 'create_nii_header', 'write_nii']
+__all__ = ['NiiHdr', 'NiiHdrField', 'write_nii_from_par']
 
 #Reference for NIFTI header values can be found at:
 #http://nifti.nimh.nih.gov/pub/dist/src/niftilib/nifti1.h
@@ -29,9 +32,9 @@ _UDATATYPE_TABLE = {
     64: nifti_defines.kDT_UINT64,
 }
 
-def create_nii_header(par, angulation=None, dim=None):
+def _create_nii_header(par):
     """ create Nifti header from parameters as read from PAR file """
-    M, realvoxsize = _calc_angulation(par, angulation)
+    M, realvoxsize = _calc_angulation(par, True)
     qoffset_xyz, quatern_bcd, qfac = _nifti_mat44_to_quatern(M)
     hdr = NiiHdr()
     hdr.HdrSz = NiiHdrField(_HEADER_SIZE, 'i')
@@ -48,6 +51,8 @@ def create_nii_header(par, angulation=None, dim=None):
         par.RT = 1
     filedim = 4
     realdim = np.array([1, 1, 1])
+    dim = np.array([par.nr_dyn * par.nr_diffgrads * par.nr_echos
+        * max(par.nr_mrtypes, par.nr_realmrtypes)])
     hdr.dim = NiiHdrField(np.concatenate(([filedim], par.dim, dim, realdim)),
         'h')
     hdr.pixdim = NiiHdrField(np.concatenate(([qfac], realvoxsize,
@@ -61,6 +66,15 @@ def create_nii_header(par, angulation=None, dim=None):
     else:
         hdr.datatype = NiiHdrField(nifti_defines.kDT_FLOAT, 'h')
         hdr.bitpix = NiiHdrField(32, 'h')
+    #Determine the type that should actually be written to the nifti
+    if hdr.bitpix.val in (8, 16, 32, 64):
+        if hdr.multi_scaling_factors and hdr.bitpix.val == 32:
+            hdr.bitpixstr = 'float32'
+        else:
+            #Using a form of ternary statements here
+            u_prefix = {True: 'u', False: ''}[
+                hdr.datatype.val == _UDATATYPE_TABLE[hdr.bitpix.val]]
+            hdr.bitpixstr = '{0}int{1}'.format(u_prefix, hdr.bitpix.val)
     hdr.slice_start = NiiHdrField(0, 'h')
     #vox_offset=352.0 means that the data starts immediately after the NIFTI-1
     #header
@@ -275,11 +289,62 @@ def write_nii(fname, hdr, Data3D):
             Data3D.astype(bitpixstr).T.tofile(fd)
     except IOError as e:
         logger = logging.getLogger('raw2nii')
-        logger.error("Write failed: {0}".format(e))
+        logger.error('Write failed: {0}'.format(e))
+
+def write_nii_from_par(nii_fname, par):
+    """ Write the nifti to a file """
+    logger = logging.getLogger('raw2nii')
+    hdr = _create_nii_header(par)
+    if par.dti_revertb0:
+        _write_dynamics_files(nii_fname, par)
+    try:
+        logger.info('Writing file: {0}...'.format(nii_fname))
+        with open(nii_fname, 'wb') as fd:
+            _write_nii_header(hdr, fd)  # write header to nii binary
+            #now add 4 extra bytes in space between header and offset for data
+            #indicating that single .nii file ("n+1\0") rather than separate
+            #img/hdr files were written. see http://nifti.nimh.nih.gov
+            fd.write(bytearray(binascii.unhexlify('6e2b3100')))
+            #add remaining 0s (probably not required)
+            fd.write(bytearray([0] * (hdr.vox_offset.val - hdr.HdrSz.val - 4)))
+            #Get the datatype to actually write the slices with
+            if hdr.bitpix.val in (8, 16, 32, 64):
+                if hdr.multi_scaling_factors and hdr.bitpix.val == 32:
+                    bitpixstr = 'float32'
+                else:
+                    #Using a form of ternary statements here to prepend 'u' to
+                    #bitpixstr if datatype is present in the _UDATATYPE_TABLE
+                    u_prefix = {True: 'u', False: ''}[
+                        hdr.datatype.val == _UDATATYPE_TABLE[hdr.bitpix.val]]
+                    bitpixstr = '{0}int{1}'.format(u_prefix, hdr.bitpix.val)
+            par_dt = {8: 'b', 16: 'h', 32: 'i'}[par.bit]
+            #Read the REC file slice by slice and write to the nii right away.
+            #This significantly reduces the memory required to process the REC.
+            with open(par.rec_fname, 'rb') as rec:
+                for slicenr, sl in enumerate(par.slices_sorted):
+                    rec.seek(sl.index_in_rec_file * sl.recon_resolution_x *
+                        sl.recon_resolution_y * 2)
+                    sl_arr = array.array(par_dt)
+                    sl_arr.fromfile(rec, sl.recon_resolution_x *
+                        sl.recon_resolution_y)
+                    sl_data = np.reshape(sl_arr, (sl.recon_resolution_x,
+                        sl.recon_resolution_y)).T
+                    if par.multi_scaling_factors:
+                        sl_data = ((sl_data * sl.rescale_slope +
+                            sl.rescale_intercept) / (sl.scale_slope *
+                            sl.rescale_slope))
+                    #Flip data left-to-right for radiological order then
+                    #transpose matrix before writing to get Fortran order
+                    np.fliplr(sl_data).astype(bitpixstr).T.tofile(fd)
+        logger.info('  ...done')
+    except IOError as e:
+        logger = logging.getLogger('raw2nii')
+        logger.error('Write failed: {0}'.format(e))
+    return fd
 
 def _write_nii_header(hdr, fd):
     logger = logging.getLogger('raw2nii')
-    logger.debug("Writing NHdr...")
+    logger.debug('Writing NHdr...')
     for key in HEADER_FIELD_NAMES:
         hdrfield = getattr(hdr, key)
         prec = hdrfield.prec
@@ -311,3 +376,69 @@ def _write_nii_header(hdr, fd):
                 #    "packed matrix='{4}')".format(key, fd.tell(), prec,
                 #    val, binascii.hexlify(packed.tobytes())))
                 packed.tofile(fd)
+
+def _write_dynamics_files(nii_fname, par):
+    logger = logging.getLogger('raw2nii')
+    nslice = par.dim[2]
+    if par.nr_diffgrads != par.NumberOfVolumes:
+        logger.warning('VANDERBILT hack, the number of diffusion gradients is '
+            'not coherent, taking the info from PAR header.')
+        #Problem with slices_sorted that point the b0 at
+        #Sorted the list to keep the b0 at the end
+        #Get the first index for the b0
+        r = par.slices_sorted.diffusion_b_value_number
+        index = np.extract(r == 1, np.arange(r.shape[0]))
+        #Put the info at the end
+        B0 = np.copy(par.slices_sorted[index])
+        par.slices_sorted[index] = par.slices_sorted[-nslice:]
+        par.slices_sorted[-nslice:] = B0
+        #par.slices_sorted = np.roll(par.slices_sorted, 1)  #This may work too
+        #Keep only the number of volumes from par header
+        par.nr_diffgrads = par.NumberOfVolumes
+    logger.warning('Doing a very dirty hack to DTI data: putting b0 data as '
+        'first in ND nii file.')
+    #The last shall be first and the first shall be last
+    par.slices_sorted = np.concatenate((par.slices_sorted[-nslice:],
+        par.slices_sorted[:-nslice]))
+    #Write the bval after sorting the slices. Put the b0 first if needed from
+    #the par.slices_sorted in the bval and bvec
+    Img_size = par.slices.shape[0]
+    numberofslices_from_header = par.gen_info.max_number_of_slices_locations
+    numberofslices = Img_size // par.NumberOfVolumes
+    if not np.allclose(numberofslices_from_header, numberofslices):
+        logger.warning('DTI incomplete. Number of slices different from header '
+            'and reality.')
+        sl_i = np.arange(0, par.NumberOfVolumes * numberofslices_from_header,
+            numberofslices_from_header)
+    else:  # No error with the number of slices
+        sl_i = np.arange(0, par.NumberOfVolumes * numberofslices,
+            numberofslices)
+    #b0moved = (par.slices_sorted[-1].index_in_rec_file + 1 == Img_size)
+    logger.warning('VANDERBILT hack -> putting last value in front for '
+        'bval/bvec.')
+    sl_i = np.roll(sl_i, 1)
+    b_slices = par.slices[sl_i]
+    name, ext = os.path.splitext(nii_fname)
+    bval_filename = name + '-x-bval.txt'
+    bvec_filename = name + '-x-bvec.txt'
+    try:
+        with open(bval_filename, 'wb') as bval_file:
+            bval_file.writelines('{0:.6f} '.format(x)
+                for x in b_slices.diffusion_b_factor)
+    except OSError as e:
+        logger.error('Failed to write bval text file "{0}": {1}'.format(
+            bval_filename, e))
+    try:
+        with open(bvec_filename, 'wb') as bvec_file:
+            bvec_file.writelines('{0:.6f} '.format(x)
+                for x in b_slices.diffusion_rl)
+            bvec_file.write('\n')
+            #After checking the dtiqa process, need to flip Y data (so minus)
+            bvec_file.writelines('{0:.6f} '.format(-y)
+                for y in b_slices.diffusion_ap)
+            bvec_file.write('\n')
+            bvec_file.writelines('{0:.6f} '.format(z)
+                for z in b_slices.diffusion_fh)
+    except OSError as e:
+        logger.error('Failed to write bvec text file "{0}": {1}'.format(
+            bvec_filename, e))

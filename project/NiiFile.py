@@ -14,7 +14,7 @@ class NiiHdr:
         for key in self.fieldnames():
             val = getattr(self, key)
             s.append('{0}="{1}"'.format(key, val))
-        return "<NiiHdr {0}>".format(" ".join(s))
+        return '<NiiHdr {0}>'.format(' '.join(s))
 
 class NiiHdrField:
     """ Arbitrary structure """
@@ -23,4 +23,4 @@ class NiiHdrField:
         self.prec = prec
 
     def __repr__(self):
-        return "<struct val={0} prec={1}>".format(self.val, self.prec)
+        return '<struct val={0} prec={1}>'.format(self.val, self.prec)
