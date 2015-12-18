@@ -2,7 +2,7 @@
 files, and returns them in a structure. Reads version number of Philips
 research tools and interpretes accordingly. Research tools are used to
 extract data from database; dataformats differ considerably between
-versions. R2AGUI now handles V3 and V4
+versions. We now handle V3 and V4
 
 function read_par
     par_fname: string with complete par-file name (with path)
