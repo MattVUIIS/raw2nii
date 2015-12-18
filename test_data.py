@@ -72,11 +72,12 @@ def run_test(canon_data_folder, trial_folder, rtol, atol):
             logger.warning('Body shapes are different: {0} -> {1}'.format(
                 canon_body['dtype'].shape, test_body['dtype'].shape))
         elif not np.allclose(canon_body['data'], test_body['data'], rtol, atol):
-            diff_output, err_output = subprocess.Popen([
-                './tools/nii_body_diff.sh', canon_nifti, test_nifti],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-            logger.warning('Body data is different:\n{0}{1}'.format(
-                diff_output, err_output))
+            logger.warning('Body data is different')
+            #diff_output, err_output = subprocess.Popen([
+            #    './tools/nii_body_diff.sh', canon_nifti, test_nifti],
+            #    stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            #logger.warning('Body data is different:\n{0}{1}'.format(
+            #    diff_output, err_output))
     return 0
 
 if __name__ == '__main__':
