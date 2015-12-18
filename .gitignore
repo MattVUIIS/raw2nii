@@ -3,5 +3,16 @@
 *.swo
 *.log
 .DS_Store
+._*
 testOutput
 canonicalData
+
+#Image files
+*.dcm
+*.DCM
+*.par
+*.PAR
+*.rec
+*.REC
+*.nii
+*.NII
