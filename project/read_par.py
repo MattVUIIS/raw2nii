@@ -15,6 +15,7 @@ import logging
 import numpy as np
 import re
 
+import par_defines
 from PARFile import PARFile
 
 
@@ -28,10 +29,6 @@ _SUBVAR_NAMES = {
     'pixel_spacing': ('x', 'y'),
     'diffusion': ('ap', 'fh', 'rl'),
 }
-
-_ORIENT_TRA = 1  # traverse orientation
-_ORIENT_SAG = 2  # sagittal orientation
-_ORIENT_COR = 3  # coronal orientation
 
 _IMAGE_INFORMATION_LINE = ('# === IMAGE INFORMATION ==========================='
     '===============================')
@@ -234,19 +231,19 @@ def _check_number_of_volumes(par):
 def _check_slice_orientation(par):
     logger = logging.getLogger('raw2nii')
     fov = par.gen_info.fov
-    if par.sliceorient == _ORIENT_TRA:
+    if par.sliceorient == par_defines.ORIENT_TRA:
         if not np.allclose(fov[0], fov[2]):
             logger.warning('AXIAL (TRA): par.gen_info.fov[0] != '
                 'par.gen_info.fov[2]. Setting to max')
             fov[[0, 2]] = np.max(fov[[0, 2]])
         fov_div_slices = (fov[1] / par.gen_info.max_number_of_slices_locations)
-    elif par.sliceorient == _ORIENT_COR:
+    elif par.sliceorient == par_defines.ORIENT_COR:
         if not np.allclose(fov[1], fov[2]):
             logger.warning('AXIAL (COR): par.gen_info.fov[1] != '
                 'par.gen_info.fov[2]. Setting to max')
             fov[[1, 2]] = np.max(fov[[1, 2]])
         fov_div_slices = (fov[0] / par.gen_info.max_number_of_slices_locations)
-    elif par.sliceorient == _ORIENT_SAG:
+    elif par.sliceorient == par_defines.ORIENT_SAG:
         if not np.allclose(fov[1], fov[0]):
             logger.warning('AXIAL (SAG): par.gen_info.fov[1] != '
                 'par.gen_info.fov[0]. Setting to max')
