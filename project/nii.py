@@ -8,6 +8,7 @@ import os
 import struct
 
 import nifti_defines
+import par_defines
 import raw2nii_version
 from NiiFile import NiiHdr, NiiHdrField, HEADER_FIELD_NAMES
 
@@ -129,14 +130,14 @@ def _calc_angulation(par, angulation):
             [np.zeros(3)])), col), axis=1)
     else:
         R_tot = np.eye(4)
-    if 1 == par.sliceorient:  # Traversal
+    if par.sliceorient == par_defines.ORIENT_TRA:  # Traversal
         lmm = np.eye(4)  # Do not rotate
         lXmm = par.fov_apfhrl[2] / par.dim[0]
         lYmm = par.fov_apfhrl[0] / par.dim[1]
         #Use smallest in plane resolution...
         lXmm, lYmm = _set_larger(lXmm, lYmm)
         lZmm = par.fov_apfhrl[1] / par.dim[2]
-    elif 2 == par.sliceorient:  # Sagittal
+    elif par.sliceorient == par_defines.ORIENT_SAG:  # Sagittal
         lmm = np.array([[0, 0, -1, 0], [1, 0, 0, 0], [0, -1, 0, 0],
             [0, 0, 0, 1]])
         #Vanderbilt override
@@ -145,7 +146,7 @@ def _calc_angulation(par, angulation):
         #Use smallest in plane resolution...
         lXmm, lYmm = _set_larger(lXmm, lYmm)
         lZmm = par.fov_apfhrl[2] / par.dim[2]
-    elif 3 == par.sliceorient:  # Coronal
+    elif par.sliceorient == par_defines.ORIENT_COR:  # Coronal
         lmm = np.array([[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0],
             [0, 0, 0, 1]])  # Rotate 90 degrees
         #Vanderbilt override
@@ -261,35 +262,6 @@ def _nifti_mat44_to_quatern(A):
             a = -a
     quatern_bcd = np.array([b, c, d])
     return qoffset_xyz, quatern_bcd, qfac
-
-def write_nii(fname, hdr, Data3D):
-    """ Write the nifti to a file """
-    try:
-        with open(fname, 'wb') as fd:
-            _write_nii_header(hdr, fd)  # write header to nii binary
-            if hdr.bitpix.val in (8, 16, 32, 64):
-                if hdr.multi_scaling_factors and hdr.bitpix.val == 32:
-                    bitpixstr = 'float32'
-                else:
-                    #Using a form of ternary statements here
-                    u_prefix = {True: 'u', False: ''}[
-                        hdr.datatype.val == _UDATATYPE_TABLE[hdr.bitpix.val]]
-                    bitpixstr = '{0}int{1}'.format(u_prefix, hdr.bitpix.val)
-            #now add 4 extra bytes in space between header and offset for data
-            #indicating that single .nii file ("n+1\0") rather than separate
-            #img/hdr files were written. see http://nifti.nimh.nih.gov
-            fd.write(bytearray(binascii.unhexlify('6e2b3100')))
-            #add remaining 0s (probably not required)
-            fd.write(bytearray([0] * (hdr.vox_offset.val - hdr.HdrSz.val
-                - 4)))
-            for s3 in range(Data3D.shape[2]):
-                #flip data in order to write out
-                Data3D[:,:,s3] = np.fliplr(Data3D[:,:,s3])
-            #Transpose matrix before writing to get Fortran order
-            Data3D.astype(bitpixstr).T.tofile(fd)
-    except IOError as e:
-        logger = logging.getLogger('raw2nii')
-        logger.error('Write failed: {0}'.format(e))
 
 def write_nii_from_par(nii_fname, par):
     """ Write the nifti to a file """
@@ -413,7 +385,6 @@ def _write_dynamics_files(nii_fname, par):
     else:  # No error with the number of slices
         sl_i = np.arange(0, par.NumberOfVolumes * numberofslices,
             numberofslices)
-    #b0moved = (par.slices_sorted[-1].index_in_rec_file + 1 == Img_size)
     logger.warning('VANDERBILT hack -> putting last value in front for '
         'bval/bvec.')
     sl_i = np.roll(sl_i, 1)
