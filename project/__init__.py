@@ -1,1 +1,1 @@
-from convert_raw2nii import convert_raw2nii
+from raw2nii import raw_convert
