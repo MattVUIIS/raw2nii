@@ -191,8 +191,9 @@ def _get_image_def(frame):
     #  contrast type                            (string)
         '{0:4d}'.format(d2p_defines.CONTRAST_TYPE_ENUM[frame.contrast_type]),
     #  diffusion anisotropy type                (string)
-        d2p_defines.DIFF_ANISOTROPY_TYPE_ENUM[frame.diff_anisotropy_type].rjust(
-            4),
+        '{0:4d}'.format(d2p_defines.DIFF_ANISOTROPY_TYPE_ENUM.get(
+            frame.diff_anisotropy_type,
+            d2p_defines.DIFF_ANISOTROPY_TYPE_DEFAULT)),
     #  diffusion (ap, fh, rl)                   (3*float)
         '{0:7.3f}'.format(frame.diff_ap), '{0:8.3f}'.format(frame.diff_fh),
         '{0:8.3f}'.format(frame.diff_rl),
