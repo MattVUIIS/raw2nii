@@ -17,12 +17,12 @@ from spm_type import spm_type
 def raw_convert(input_file, output_file, **options):
     logger = logging.getLogger('raw2nii')
     #Convert from DCM to PAR
-    if (re.search('.dcm$', input_file, re.I) and re.search('.par$', output_file,
-            re.I)):
+    if re.search('.dcm$', input_file, re.I) and re.search('.par$', output_file,
+            re.I):
         return convert_dcm2par(input_file, output_file, **options)
     #Convert from PAR to NII
-    if (re.search('.par$', input_file, re.I) and re.search('.nii$', output_file,
-            re.I)):
+    if re.search('.par$', input_file, re.I) and re.search('.nii$', output_file,
+            re.I):
         return convert_par2nii(input_file, output_file, **options)
     #Error
     logger.error('Conversion not supported')
@@ -38,10 +38,10 @@ def _get_rec_fname(par_fname):
 def convert_par2nii(par_fname, nii_fname, no_angulation, no_rescale,
         dti_revertb0):
     """
-        no_angulation   : when True: include affine transformation as defined in PAR
+        no_angulation   : when True: do NOT include affine transformation as defined in PAR
                        file in hdr part of Nifti file (nifti only, EXPERIMENTAL!)
-        no_rescale      : when True: store intensity scale as found in PAR
-                       file (assumed equall for all slices). Yields DV values.
+        no_rescale      : when True: do NOT store intensity scale as found in PAR
+                       file (assumed equall for all slices). do NOT yield DV values.
         dti_revertb0 : when False (default), philips ordering is used for DTI data
                        (eg b0 image last). When True, b0 is saved as first image
                        in 3D or 4D data

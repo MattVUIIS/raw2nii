@@ -160,7 +160,7 @@ PAR_HEADER = """# === DATA DESCRIPTION FILE ====================================
 # CAUTION - Investigational device.
 # Limited by Federal Law to investigational use.
 #
-# Dataset name: {dataset_name} (raw2nii {tool_version})
+# Dataset name: {dataset_name} ({tool_info})
 #
 # CLINICAL TRYOUT             Research image export tool     {par_version}
 #

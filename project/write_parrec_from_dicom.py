@@ -1,4 +1,5 @@
 from __future__ import division
+import itertools
 import numpy as np
 import pprint
 import re
@@ -13,7 +14,8 @@ __all__ = ['write_parrec_from_dicom']
 def _get_header(dataset_name):
     info = {
         'dataset_name': dataset_name,
-        'tool_version': raw2nii_version.VERSION,
+        #'tool_info': 'raw2nii {0}'.format(raw2nii_version.VERSION),
+        'tool_info': 'convert_dicom_to_xmlrec.pl v0.4',
         'par_version': 'V4.2',
     }
     return d2p_defines.PAR_HEADER.format(**info)
@@ -107,7 +109,7 @@ def _get_general_info(dcm):
     return d2p_defines.PAR_GEN_INFO.format(**gen_info)
 
 
-def _get_image_def(frame):
+def _get_image_def(frame, index):
     return ' '.join([
     #  slice number                             (integer)
         '{0:3d}'.format(frame.slice_num),
@@ -122,7 +124,7 @@ def _get_image_def(frame):
     #  scanning sequence                        (integer)
         str(d2p_defines.IMG_SEQ_ENUM[frame.img_seq]),
     #  index in REC file (in images)            (integer)
-        '{0:5d}'.format(frame.index),
+        '{0:5d}'.format(index),
     #  image pixel size (in bits)               (integer)
         '{0:3d}'.format(frame.px_size),
     #  scan percentage                          (integer)
@@ -219,7 +221,9 @@ def write_parrec_from_dicom(par_fname, rec_fname, dcm):
         f.write(_get_header(dataset_name))
         f.write(_get_general_info(dcm))
         f.write(d2p_defines.PAR_MIDDLE_SECTION)
-        f.writelines(_get_image_def(frame) for frame in dcm.frames)
+        index = itertools.count(0)
+        f.writelines(_get_image_def(frame, next(index)) for stack in dcm.stacks
+            for frame in stack)
         f.write(d2p_defines.PAR_FOOTER)
     with open(rec_fname, 'wb') as f:
         f.write(dcm.raw_data)
