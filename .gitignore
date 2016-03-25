@@ -6,6 +6,7 @@
 ._*
 testOutput
 canonicalData
+raw2nii
 
 #Image files
 *.dcm

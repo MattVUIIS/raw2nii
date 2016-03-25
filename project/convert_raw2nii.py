@@ -127,7 +127,7 @@ def _generate_filename(sl):
         bval_suffix = ''
         bval_ndsuffix = ''
 
-if __name__ == '__main__':
+def main():
     logger = logging.getLogger('raw2nii')
     logger.setLevel(logging.INFO)
     _formatter = logging.Formatter('%(levelname)s %(asctime)s %(filename)s: '
@@ -152,3 +152,6 @@ if __name__ == '__main__':
     convert_raw2nii(options.filelist, options.prefix, options.suffix,
         options.pathpar, options.outfolder, options.outputformat,
         options.angulation, options.rescale, options.dti_revertb0)
+
+if __name__ == '__main__':
+    main()
