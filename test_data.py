@@ -7,7 +7,7 @@ import pprint
 import subprocess
 import tempfile
 
-from project import convert_raw2nii
+from project.raw2nii import raw_convert
 from tools.nii_info import read_nii
 
 
@@ -27,12 +27,13 @@ def run_test(canon_data_folder, trial_folder, rtol, atol):
     path_par = os.path.join(canon_data_folder, trial_folder, 'PARREC')
     input_par = glob.glob('{0}/*.PAR'.format(path_par))[0]
     test_folder = os.path.join('testOutput', trial_folder, 'NIFTI')
+    nii_basename, _ = os.path.splitext(os.path.basename(input_par))
+    output_nii = os.path.join(test_folder, nii_basename + '.nii')
     #Run NIFTI conversion function and output to testOutput directory
-    logger.info('Running test: python convert_raw2nii.py {0} --pathpar={1} '
-        '--outfolder={2}'.format(input_par, path_par, test_folder))
-    output = convert_raw2nii(filelist=[input_par], prefix='', suffix='',
-        pathpar=path_par, outfolder=test_folder, outputformat=1, angulation=1,
-        rescale=1, dti_revertb0=0)
+    logger.info('Running test: python raw2nii.py {0} {1}'.format(input_par,
+        output_nii))
+    output = raw_convert(input_par, output_nii, no_angulation=False,
+        no_rescale=False, dti_revertb0=True)
     #Compare to the 4D data since we have the Vanderbilt override behavior
     canon_nifti_folder = os.path.join(canon_data_folder, trial_folder, 'NIFTI',
         '4D')
@@ -70,7 +71,7 @@ def run_test(canon_data_folder, trial_folder, rtol, atol):
                 canon_body['dtype'], test_body['dtype']))
         elif canon_body['data'].shape != test_body['data'].shape:
             logger.warning('Body shapes are different: {0} -> {1}'.format(
-                canon_body['dtype'].shape, test_body['dtype'].shape))
+                canon_body['data'].shape, test_body['data'].shape))
         elif not np.allclose(canon_body['data'], test_body['data'], rtol, atol):
             logger.warning('Body data is different')
             #diff_output, err_output = subprocess.Popen([
