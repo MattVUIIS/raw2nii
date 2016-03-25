@@ -352,6 +352,27 @@ def _write_nii_header(hdr, fd):
 def _write_dynamics_files(nii_fname, par):
     logger = logging.getLogger('raw2nii')
     nslice = par.dim[2]
+
+    #Write the bval after sorting the slices. Put the b0 first if needed from
+    #the par.slices_sorted in the bval and bvec
+    Img_size = par.slices.shape[0]
+    numberofslices_from_header = par.gen_info.max_number_of_slices_locations
+    numberofslices = Img_size // par.NumberOfVolumes
+    if not np.allclose(numberofslices_from_header, numberofslices):
+        logger.warning('DTI incomplete. Number of slices different from header '
+            'and reality.')
+        sl_i = np.arange(0, par.NumberOfVolumes * numberofslices_from_header,
+            numberofslices_from_header)
+    else:  # No error with the number of slices
+        sl_i = np.arange(0, par.NumberOfVolumes * numberofslices,
+            numberofslices)
+
+    if par.is_multishell:
+        par.slices_sorted = np.roll(par.slices_sorted, -numberofslices)
+    logger.warning('VANDERBILT hack -> putting last value in front for '
+        'bval/bvec.')
+    sl_i = np.roll(sl_i, 1)
+
     if par.nr_diffgrads != par.NumberOfVolumes:
         logger.warning('VANDERBILT hack, the number of diffusion gradients is '
             'not coherent, taking the info from PAR header.')
@@ -367,28 +388,15 @@ def _write_dynamics_files(nii_fname, par):
         #par.slices_sorted = np.roll(par.slices_sorted, 1)  #This may work too
         #Keep only the number of volumes from par header
         par.nr_diffgrads = par.NumberOfVolumes
+
+    b_slices = par.slices_sorted[sl_i]
+
     logger.warning('Doing a very dirty hack to DTI data: putting b0 data as '
         'first in ND nii file.')
     #The last shall be first and the first shall be last
     par.slices_sorted = np.concatenate((par.slices_sorted[-nslice:],
-        par.slices_sorted[:-nslice]))
-    #Write the bval after sorting the slices. Put the b0 first if needed from
-    #the par.slices_sorted in the bval and bvec
-    Img_size = par.slices.shape[0]
-    numberofslices_from_header = par.gen_info.max_number_of_slices_locations
-    numberofslices = Img_size // par.NumberOfVolumes
-    if not np.allclose(numberofslices_from_header, numberofslices):
-        logger.warning('DTI incomplete. Number of slices different from header '
-            'and reality.')
-        sl_i = np.arange(0, par.NumberOfVolumes * numberofslices_from_header,
-            numberofslices_from_header)
-    else:  # No error with the number of slices
-        sl_i = np.arange(0, par.NumberOfVolumes * numberofslices,
-            numberofslices)
-    logger.warning('VANDERBILT hack -> putting last value in front for '
-        'bval/bvec.')
-    sl_i = np.roll(sl_i, 1)
-    b_slices = par.slices[sl_i]
+        par.slices_sorted[:-nslice])).view(np.recarray)
+
     name, ext = os.path.splitext(nii_fname)
     bval_filename = name + '-x-bval.txt'
     bvec_filename = name + '-x-bvec.txt'
