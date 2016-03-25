@@ -127,7 +127,7 @@ def _generate_filename(sl):
         bval_suffix = ''
         bval_ndsuffix = ''
 
-if __name__ == '__main__':
+def main():
     logger = logging.getLogger('raw2nii')
     logger.setLevel(logging.INFO)
     _formatter = logging.Formatter('%(levelname)s %(asctime)s %(filename)s: '
@@ -148,3 +148,6 @@ if __name__ == '__main__':
     options = vars(options)
     options.pop('debug', None)
     sys.exit(raw_convert(**options))
+
+if __name__ == '__main__':
+    main()

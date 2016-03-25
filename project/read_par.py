@@ -186,11 +186,6 @@ def _parse_slices_V4X(par, parfile):
     if len(par.slices[0]) != par.field_len:
         raise ValueError('Slice tag format does not match the number of '
             'entries')
-    #Sort the slices
-    par.slices_sorted = par.slices[np.lexsort((par.slices.slice_number,
-        par.slices.dynamic_scan_number, par.slices.diffusion_b_value_number,
-        par.slices.gradient_orientation_number, par.slices.echo_number,
-        par.slices.image_type_mr, par.slices.scanning_sequence))]
     #Determine number of interleaved image sequences (was:types,
     #name kept for historic reasons) (e.g. angio)
     par.nr_mrtypes = np.unique(par.slices.scanning_sequence).shape[0]
@@ -208,6 +203,19 @@ def _parse_slices_V4X(par, parfile):
         logger.warning('Number of dynamics in header of PAR file does not '
             'match number of dynamics in the body')
     par.nr_bvalues = np.unique(par.slices.diffusion_b_value_number).shape[0]
+    #Check if multishell
+    par.is_multishell = par.nr_bvalues > 2
+    #Sort the slices
+    sort_order = (par.slices.slice_number, par.slices.dynamic_scan_number,
+        par.slices.diffusion_b_value_number,
+        par.slices.gradient_orientation_number, par.slices.echo_number,
+        par.slices.image_type_mr, par.slices.scanning_sequence)
+    if par.is_multishell:
+        sort_order = sort_order[:2] + (sort_order[3], sort_order[2]) + (
+            sort_order[4:])  # Swap diffusion b value and gradient orientation
+    else:
+        pass  # B0 and B1 diffusion weighting
+    par.slices_sorted = par.slices[np.lexsort(sort_order)]
     return par.slices
 
 def _check_number_of_volumes(par):
