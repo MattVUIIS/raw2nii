@@ -11,7 +11,6 @@ from nii import write_nii_from_par
 from write_parrec_from_dicom import write_parrec_from_dicom
 from read_dicom import read_dicom
 from read_par import read_par
-from spm_type import spm_type
 
 
 def raw_convert(input_file, output_file, **options):

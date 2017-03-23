@@ -1,5 +1,6 @@
 # raw2nii
 An open tool for converting Phillips PAR/REC files into the NIfTI format.
+Dependencies: numpy, nibabel
 
 ### Usage
 From the project folder:
