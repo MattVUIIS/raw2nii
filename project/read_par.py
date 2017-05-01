@@ -182,7 +182,12 @@ def _parse_definition_V4X(par, parfile):
 def _parse_slices_V4X(par, parfile):
     """ Reads each slice line from the PAR file and calculates some metrics """
     logger = logging.getLogger('raw2nii')
-    par.slices = np.loadtxt(parfile, dtype=par.fields).view(np.recarray)
+    par.slices = np.loadtxt(parfile, dtype=par.fields, ndmin=1).view(
+        np.recarray)
+    if not par.slices.shape:
+        logger.warning('par.slices has wrong shape: {0}, reshaping...'.format(
+            par.slices.shape))
+        par.slices = np.reshape(par.slices, (1,))
     if len(par.slices[0]) != par.field_len:
         raise ValueError('Slice tag format does not match the number of '
             'entries')
